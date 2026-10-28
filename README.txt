@@ -1,6 +1,17 @@
-Rüfner Beer Pong V1.4 – lokale Testversion.
-Änderungen: zwei Trickshots pro Runde möglich; Trickshots einzeln und ohne Kombination, sofortige Becherentfernung; Bedienfelder direkt auf dem Tisch; grössere Becher; Formationen nach Originalreglement (Seiten 5–6), konstante Rasterabstände und am hinteren Tischende.
-Profile/Statistiken bleiben unter dem bisherigen localStorage-Schlüssel erhalten.
-GitHub Pages: Dateien im Repository-Stamm ersetzen.
+RÜFNER BEER PONG V1.6 – SPIEL-UPDATE UND ONLINE-VORBEREITUNG
 
-V1.5: Grössere Becher mit Abstand, Zwischenstand und Spielstatistik während des Spiels ausgeblendet, Trickshot-Einblendung für 5 Sekunden, Zusammenstellen als Modal ohne Scrollen.
+SPIEL-UPDATE (sofort nutzbar):
+- Neuer COM Unbesiegbar (90% Grundtrefferchance).
+- Auswahl der COM-Trickshot-Aufgabe als Vollbild-Overlay über dem Tisch.
+- Vorhandene lokale Profile und Statistiken bleiben im bisherigen localStorage-Schlüssel.
+
+ONLINE-STATUS: Noch NICHT live und NICHT mit einer Datenbank verbunden.
+Die Dateien im Ordner online-setup/ sind der technische Einstieg für die
+Online-Funktionen. Für eine produktive Installation sind ein eigenes
+Supabase-Projekt, Auth-Konfiguration, Edge Functions, Berechtigungen,
+Passkeys/WebAuthn und ein getesteter Datenabgleich erforderlich.
+
+WICHTIG: Kein service_role key, Admin-Passwort oder geheimes Token in
+GitHub Pages, Browser-JavaScript oder ein öffentliches Repository hochladen.
+
+GitHub Pages weiterhin unverändert nutzbar.

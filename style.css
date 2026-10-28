@@ -66,3 +66,12 @@
 }
 @media(max-width:370px){.matchstack .cups{transform:scale(.67)}.matchstack .board-top{transform:scale(.67) rotate(180deg)}}
 @media(max-height:740px) and (max-width:650px){.matchstack .cupfield{height:clamp(145px,24vh,185px)}}
+
+/* V1.6: COM-Trickshot-Auswahl immer über dem Spielfeld */
+.trick-choice-backdrop{position:fixed;inset:0;z-index:110;background:rgba(3,12,18,.84);display:grid;place-items:center;padding:14px;overscroll-behavior:contain}
+.trick-choice-modal{width:min(540px,100%);max-height:calc(100dvh - 28px);overflow:auto;background:linear-gradient(155deg,#18363d,#0d202b);border:2px solid #d6aa55;border-radius:20px;padding:20px;box-shadow:0 20px 80px #000b;text-align:center}
+.trick-choice-title{font-size:clamp(24px,6vw,38px);font-weight:900;color:#ffdd85;text-shadow:0 0 24px #ffb93a99}
+.trick-choice-modal p{margin:8px 0 18px}
+.trick-choice-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.trick-choice-grid .btn{white-space:normal;min-height:52px;padding:10px 7px}
+@media(max-width:380px){.trick-choice-modal{padding:12px}.trick-choice-grid{gap:6px}.trick-choice-grid .btn{font-size:13px;min-height:46px}}
