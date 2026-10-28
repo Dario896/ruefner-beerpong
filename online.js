@@ -44,6 +44,38 @@ else {
   }catch(err){status('Registrierung fehlgeschlagen: '+(err.message||'Unbekannter Fehler'));}
   finally{$('reg-password').value='';button.disabled=false;}
  });
+  let directory=[];
+  async function loadOnlineResults(){
+   if(!currentUser)return;
+   const message=$('result-status');
+   const {data:players,error:dirError}=await client.rpc('ruefner_player_directory');
+   if(dirError){message.textContent='Spielerverzeichnis nicht verfügbar. SQL für V2.0 ausführen.';return;}
+   directory=players||[];
+   const me=directory.find(p=>p.id===currentUser.id);
+   if(!me){message.textContent='Eigenes Profil nicht im Verzeichnis.';return;}
+   const other=directory.filter(p=>p.id!==currentUser.id);
+   $('opponent').replaceChildren(...other.map(p=>new Option(p.username,p.id)));
+   const winnerOptions=[me,...other];
+   $('winner').replaceChildren(...winnerOptions.map(p=>new Option(p.username,p.id)));
+   $('opponent').onchange=()=>{const opponent=$('opponent').value;const available=directory.filter(p=>p.id===currentUser.id||p.id===opponent);$('winner').replaceChildren(...available.map(p=>new Option(p.username,p.id)));};
+   $('opponent').dispatchEvent(new Event('change'));
+   const {data:results,error:readError}=await client.from('ruefner_friendly_results').select('id,player_a,player_b,winner,created_at').order('created_at',{ascending:false}).limit(100);
+   if(readError){message.textContent='Ergebnisse nicht lesbar: '+readError.message;return;}
+   const label=id=>directory.find(p=>p.id===id)?.username||'Spieler';
+   $('results-list').replaceChildren(...(results||[]).map(r=>{const div=document.createElement('div');div.className='notice';div.textContent=`${new Date(r.created_at).toLocaleDateString('de-CH')}: ${label(r.player_a)} gegen ${label(r.player_b)} · 🏆 ${label(r.winner)}`;return div;}));
+   if(!results?.length)$('results-list').textContent='Noch keine gemeinsamen Ergebnisse.';
+   message.textContent=other.length?'Ergebnisse sind für beide beteiligten Spieler sichtbar.':'Noch kein zweiter registrierter Spieler vorhanden.';
+   $('result-form').querySelector('button').disabled=!other.length;
+  }
+  $('result-form').addEventListener('submit',async e=>{
+   e.preventDefault();if(!currentUser)return;
+   const opponent=$('opponent').value,winner=$('winner').value;
+   if(!opponent||opponent===currentUser.id||![currentUser.id,opponent].includes(winner))return;
+   const button=e.currentTarget.querySelector('button');button.disabled=true;
+   const {error}=await client.from('ruefner_friendly_results').insert({player_a:currentUser.id,player_b:opponent,winner});
+   if(error){$('result-status').textContent='Speichern fehlgeschlagen: '+error.message;button.disabled=false;return;}
+   await loadOnlineResults();button.disabled=false;
+  });
  $('logout').addEventListener('click',async()=>{await client.auth.signOut();await refresh();});
  await refresh();
 }
