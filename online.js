@@ -2,6 +2,7 @@ import {createClient} from 'https://esm.sh/@supabase/supabase-js@2.49.4';
 const $=id=>document.getElementById(id);
 const status=msg=>{$('setup-status').textContent=msg;};
 const cfg=window.RUEFNER_SUPABASE;
+let currentUser=null;
 const ready=cfg?.url?.startsWith('https://')&&cfg?.publishableKey&&!cfg.publishableKey.includes('HIER_');
 if(!ready){status('Bitte den bestehenden öffentlichen Publishable Key in online-config.js beibehalten.');}
 else {
@@ -10,13 +11,13 @@ else {
   try {
    const {data:{user},error}=await client.auth.getUser();
    if(error&&!String(error.message).includes('Auth session missing'))throw error;
-   $('login-form').hidden=!!user;$('register-form').hidden=!!user;$('account').hidden=!user;
+   currentUser=user||null;$('results-panel').hidden=!user;$('login-form').hidden=!!user;$('register-form').hidden=!!user;$('account').hidden=!user;
    if(!user){status('Bitte mit Benutzername oder Administrator-E-Mail anmelden.');return;}
    const {data:profile,error:pe}=await client.from('player_profiles').select('username,is_admin,is_blocked').eq('id',user.id).single();
    if(pe||!profile){status('Angemeldet, aber Profil nicht lesbar. Bitte Administrator kontaktieren.');$('account-name').textContent='Anmeldung aktiv.';return;}
    if(profile.is_blocked){await client.auth.signOut();status('Dieses Konto ist gesperrt.');return;}
    $('account-name').textContent=`${profile.username} · ${profile.is_admin?'👑 Administrator':'Spieler'}`;
-   status('Erfolgreich angemeldet! Online-Synchronisierung der Spiele ist noch nicht aktiviert.');
+   status('Erfolgreich angemeldet! Gemeinsame Ergebnisse sind im Testbetrieb verfügbar.');await loadOnlineResults();
   }catch(e){status('Verbindung fehlgeschlagen: '+(e.message||'Unbekannter Fehler'));}
  }
  $('login-form').addEventListener('submit',async e=>{
