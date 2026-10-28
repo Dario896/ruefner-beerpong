@@ -13,6 +13,8 @@ const formationPatterns={
 };
 const variantNames={6:['Grosse Pyramide'],5:['Full House 1','Full House 2','Full House 3'],4:['Vagina'],3:['Kleine Pyramide'],2:['Paar 1','Paar 2','Paar 3']};
 let db=load(),view='home',match=null,ui={};
+let trickFlashTimer=null;
+function showTrickFlash(label){ui.trickFlash={label,until:Date.now()+5000};clearTimeout(trickFlashTimer);trickFlashTimer=setTimeout(()=>{ui.trickFlash=null;if(view==='game')render()},5050)}
 function load(){try{const v=JSON.parse(localStorage.getItem(KEY));if(v&&v.players&&v.games&&v.leagues)return v}catch(e){}return {players:[],games:[],leagues:[],current:null,admin:null,record:{}}}
 function save(){localStorage.setItem(KEY,JSON.stringify(db))}
 function id(){return Math.random().toString(36).slice(2,10)}
@@ -26,7 +28,7 @@ function reigningChampion(){const finished=db.leagues.filter(l=>l.closed&&champi
 function go(v){view=v;ui={};render()}
 function btn(text,fn,cls=''){return `<button class="btn ${cls}" onclick="${fn}">${text}</button>`}
 function header(){return `<div class="top"><div class="brand" onclick="go('home')" style="cursor:pointer">🏓 Rüfner <span>Beer Pong</span></div><div class="row">${db.current?`<span class="pill">${esc(name(db.current))}${reigningChampion()===db.current?' 👑':''}</span>`:''}${btn('☰ Menü',"go('home')",'secondary')}</div></div>`}
-function render(){const root=document.getElementById('app');let body='';try{body=({home,profiles,training,friendship,league,stats,rules,game,history})[view]?.()||home()}catch(e){body=`<div class="notice">Fehler: ${esc(e.message)}</div>${btn('Zurück',"go('home')")}`};root.innerHTML=`<div class="shell">${header()}${body}<footer>Rüfner Beer Pong · V1.4 lokale Testversion · Daten nur auf diesem Gerät</footer></div>`}
+function render(){const root=document.getElementById('app');let body='';try{body=({home,profiles,training,friendship,league,stats,rules,game,history})[view]?.()||home()}catch(e){body=`<div class="notice">Fehler: ${esc(e.message)}</div>${btn('Zurück',"go('home')")}`};root.innerHTML=`<div class="shell">${header()}${body}<footer>Rüfner Beer Pong · V1.5 lokale Testversion · Daten nur auf diesem Gerät</footer></div>`}
 function home(){return `<section class="hero"><div class="eyebrow">Die Liga beginnt hier</div><h1>Becher. Bomben. Ruhm. 🍻</h1><p>Training gegen COM, echte Duelle und Premier League.</p>${db.current?`<div class="row">${avatar(db.current)}<strong>Willkommen zurück, ${esc(name(db.current))}! 🍻</strong></div>`:`<div class="notice">Erstelle zuerst ein Spielerprofil und wähle es aus.</div>`}</section><div class="grid">${[['🤖','Training','Du gegen den COM. Privat, ohne Statistik.','training'],['🏓','Freundschaftsspiel','Echte Duelle mit gemeinsamer Statistik.','friendship'],['🏆','Premier League','15 Nights und ein grosses Finale.','league'],['📊','Statistiken','Ranglisten, Bomben und direkte Duelle.','stats'],['👤','Profile','Spieler verwalten und Profilbild ändern.','profiles'],['📖','Regeln','Das Rüfner Beer Pong Reglement.','rules']].map(a=>`<button class="card action" onclick="go('${a[3]}')"><div class="emoji">${a[0]}</div><h3>${a[1]}</h3><p>${a[2]}</p></button>`).join('')}</div>`}
 function profiles(){return `<div class="section"><h2>👤 Spielerprofile</h2><p class="muted">Auf diesem Gerät angelegte Profile. Später können wir sie online verbinden.</p></div><div class="panel"><h3>Neues Profil</h3><div class="field"><label>Spielername</label><input id="newName" maxlength="28" placeholder="Name"></div>${btn('Profil erstellen','createProfile()')}</div><div class="grid">${db.players.map(p=>`<div class="card"><div class="row">${avatar(p.id)}<strong>${esc(p.name)}${reigningChampion()===p.id?' 👑':''}</strong>${p.id===db.admin?'<span class="badge">Host</span>':''}</div><div class="row" style="margin-top:14px">${btn(p.id===db.current?'✓ Aktiv':'Profil auswählen',`selectProfile('${p.id}')`,p.id===db.current?'secondary':'')}${isAdmin()?btn('Name ändern',`renameProfile('${p.id}')`,'secondary'):''}</div>${p.id===db.current?`<div class="field"><label>Profilbild ändern</label><input type="file" accept="image/*" onchange="photoProfile(event,'${p.id}')"></div>`:''}</div>`).join('')}</div>`}
 function createProfile(){const el=document.getElementById('newName'),n=el.value.trim();if(n.length<2)return alert('Bitte mindestens 2 Zeichen eingeben.');if(db.players.some(p=>p.name.toLowerCase()===n.toLowerCase()))return alert('Name bereits vergeben.');const p={id:id(),name:n,photo:''};db.players.push(p);if(!db.admin)db.admin=p.id;db.current=p.id;save();render()}
@@ -57,10 +59,10 @@ function startNextTrick(){
  if(trickCount()<=0){endRound();return}
  match.tricks--;
  if(isComTurn()){match.awaitingTrick=true;match.bonusPhase=false;match.bonusType=null;render()}
- else{match.bonusPhase=true;match.bonusType=randomTrick();render()}
+ else{match.bonusPhase=true;match.bonusType=randomTrick();showTrickFlash(trickNames[match.bonusType]);render()}
 }
 function finishTrick(){
- match.bonusPhase=false;match.bonusType=null;
+ ui.trickFlash=null;clearTimeout(trickFlashTimer);match.bonusPhase=false;match.bonusType=null;
  if(checkWin())return;
  startNextTrick();
 }
@@ -75,7 +77,7 @@ function game(){
  const a=match.a,b=match.b,owner=match.turn;
  const notice=match.pending?'💣 Bombe! Wähle die markierten Becher.':match.finished?'🏆 Spiel beendet.':match.awaitingTrick?'🎩 Wähle einen Trickshot für den COM.':match.bonusPhase?`🎩 Trickshot: ${esc(trickNames[match.bonusType])} · jetzt ausführen!${trickCount()?' · danach noch ein Trickshot':''}`:`🎯 ${esc(name([a,b][owner]))} ist dran · Wurf ${match.round.length+1} von 2${trickCount()?' · '+trickCount()+' Trickshot(s) vorgemerkt':''}`;
  const controls=`<div class="game-actions">${btn('↶','undoShot()','secondary action-icon')}${canRerack()?btn('🔄','showRerack()','secondary action-icon'):''}${!match.finished&&isHumanTurn()&&!match.pending&&!match.bonusPhase&&!match.awaitingTrick&&match.round.length<2?btn('🎩','requestTrick()','secondary action-icon'):''}${!match.finished&&match.kind!=='training'&&!match.pending?btn('💀','deathCup()','secondary action-icon')+btn('⚽','ownGoal()','secondary action-icon'):''}</div>`;
- return `<div class="game-screen"><div class="section row between game-title"><h2>${match.kind==='training'?'🤖 Training':match.kind==='league'?'🏆 Premier League':'🏓 Freundschaftsspiel'}</h2>${btn('Abbrechen','cancelMatch()','secondary')}</div><div class="panel match-summary"><div class="row between"><div class="player">${avatar(a)}<strong>${esc(name(a))}</strong></div><span class="badge">VS</span><div class="player">${avatar(b)}<strong>${esc(name(b))}</strong></div></div><div class="row between"><span class="score">${match.sides[0].cups.length} Becher</span><span class="score">${match.sides[1].cups.length} Becher</span></div></div><div class="notice match-notice">${notice}</div><div class="table-with-actions"><div class="matchstack"><div class="table-side-label">🔴 ${esc(name(b))} · ${match.sides[1].cups.length}</div>${cupBoard(1)}<div class="table-middle-line"></div>${cupBoard(0)}<div class="table-side-label">🔵 ${esc(name(a))} · ${match.sides[0].cups.length}</div>${controls}</div></div>${ui.rerack?rerackPanel():''}${match.awaitingTrick?`<div class="panel trick-picker"><h3>🎩 Welchen Trickshot muss der COM machen?</h3><div class="row">${trickNames.map((t,i)=>btn(esc(t),`chooseComTrick(${i})`,'secondary')).join('')}</div></div>`:''}${match.finished?`<div class="panel finish-panel"><h2>🏆 ${esc(name(match.winner))} gewinnt!</h2><p class="muted">Vertippt? ↶ am Tisch macht den letzten Wurf rückgängig.</p>${btn('Ergebnis speichern','finishMatch()')}${btn('Nicht speichern','cancelMatch()','secondary')}</div>`:''}<div class="panel match-stats"><div class="row between"><span class="muted">${esc(name(a))}: ${match.sides[0].hits}/${match.sides[0].shots} Treffer · ${match.sides[0].bombs} Bomben</span><span class="muted">${esc(name(b))}: ${match.sides[1].hits}/${match.sides[1].shots} Treffer · ${match.sides[1].bombs} Bomben</span></div></div></div>`;
+ return `<div class="game-screen"><div class="section row between game-title"><h2>${match.kind==='training'?'🤖 Training':match.kind==='league'?'🏆 Premier League':'🏓 Freundschaftsspiel'}</h2>${btn('Abbrechen','cancelMatch()','secondary')}</div><div class="notice match-notice">${notice}</div><div class="table-with-actions"><div class="matchstack"><div class="table-side-label">🔴 ${esc(name(b))} · ${match.sides[1].cups.length}</div>${cupBoard(1)}<div class="table-middle-line"></div>${cupBoard(0)}<div class="table-side-label">🔵 ${esc(name(a))} · ${match.sides[0].cups.length}</div>${controls}</div></div>${ui.rerack?rerackPanel():''}${ui.trickFlash&&Date.now()<ui.trickFlash.until?`<div class="trick-flash" role="status" aria-live="polite"><div class="trick-flash-inner"><div class="trick-flash-title">🎩 TRICKSHOT!</div><div class="trick-flash-task">${esc(ui.trickFlash.label)}</div></div></div>`:''}${match.awaitingTrick?`<div class="panel trick-picker"><h3>🎩 Welchen Trickshot muss der COM machen?</h3><div class="row">${trickNames.map((t,i)=>btn(esc(t),`chooseComTrick(${i})`,'secondary')).join('')}</div></div>`:''}${match.finished?`<div class="panel finish-panel"><h2>🏆 ${esc(name(match.winner))} gewinnt!</h2><p class="muted">Vertippt? ↶ am Tisch macht den letzten Wurf rückgängig.</p>${btn('Ergebnis speichern','finishMatch()')}${btn('Nicht speichern','cancelMatch()','secondary')}</div>`:''}<div class="panel match-stats"><div class="row between"><span class="muted">${esc(name(a))}: ${match.sides[0].hits}/${match.sides[0].shots} Treffer · ${match.sides[0].bombs} Bomben</span><span class="muted">${esc(name(b))}: ${match.sides[1].hits}/${match.sides[1].shots} Treffer · ${match.sides[1].bombs} Bomben</span></div></div></div>`;
 }
 function snapshot(){match.undo.push(JSON.stringify({...match,undo:[]}));if(match.undo.length>30)match.undo.shift()}
 function undoShot(){if(!match?.undo.length)return;const old=match.undo.pop(),remaining=match.undo;match=JSON.parse(old);match.undo=remaining;ui.rerack=false;render()}
@@ -106,7 +108,7 @@ function afterNormalRound(){
 }
 function checkWin(){
  if(match.sides[0].cups.length&&match.sides[1].cups.length)return false;
- match.finished=true;match.winner=match.sides[0].cups.length===0?match.b:match.a;
+ ui.trickFlash=null;clearTimeout(trickFlashTimer);match.finished=true;match.winner=match.sides[0].cups.length===0?match.b:match.a;
  match.round=[];match.pending=null;match.bonus=false;match.tricks=0;match.bonusPhase=false;match.awaitingTrick=false;
  render();return true;
 }
@@ -124,7 +126,7 @@ function requestTrick(){
  match.sides[match.turn].shots++;match.round.push({miss:true,returned:true});
  if(match.round.length===2)resolveRound();else render();
 }
-function chooseComTrick(i){if(!match?.awaitingTrick||i<0||i>=trickNames.length)return;snapshot();match.awaitingTrick=false;match.bonusType=i;match.bonusPhase=true;render();setTimeout(computerTurn,650)}
+function chooseComTrick(i){if(!match?.awaitingTrick||i<0||i>=trickNames.length)return;snapshot();match.awaitingTrick=false;match.bonusType=i;match.bonusPhase=true;showTrickFlash(trickNames[i]);render();setTimeout(computerTurn,650)}
 function computerTurn(){
  if(!isComTurn()||match.finished||match.pending||match.awaitingTrick)return;
  if(match.bonusPhase){
@@ -156,7 +158,7 @@ function formationPreview(n,v,side){
  const coords=formationCoords(n,v);
  return `<svg viewBox="0 0 190 130" aria-hidden="true">${coords.map(q=>`<circle cx="${95+(q.x-145)*.8}" cy="${13+(q.y-(206-3*46))*.68}" r="15" fill="${side===1?'#d64b52':'#377fe5'}" stroke="#f6f7fb" stroke-width="3"/>`).join('')}</svg>`;
 }
-function rerackPanel(){const side=boardIndex(),n=match.sides[side].cups.length;return `<div class="panel rerack-panel"><h3>🔄 Formation auswählen</h3><div class="formation-grid">${(variantNames[n]||[]).map((_,i)=>`<button class="formation-choice" onclick="applyRerack(${side},${i},true)" aria-label="Formation ${i+1}">${formationPreview(n,i,side)}</button>`).join('')}</div>${btn('Abbrechen','closeRerack()','secondary')}</div>`}
+function rerackPanel(){const side=boardIndex(),n=match.sides[side].cups.length;return `<div class="rerack-backdrop" onclick="if(event.target===this)closeRerack()"><div class="panel rerack-panel" role="dialog" aria-modal="true" aria-label="Formation auswählen"><h3>🔄 Formation auswählen</h3><div class="formation-grid">${(variantNames[n]||[]).map((_,i)=>`<button class="formation-choice" onclick="applyRerack(${side},${i},true)" aria-label="Formation ${i+1}">${formationPreview(n,i,side)}</button>`).join('')}</div>${btn('Abbrechen','closeRerack()','secondary')}</div></div>`}
 function closeRerack(){ui.rerack=false;render()}
 function applyRerack(side,v,redraw=true){if(!match||side!==boardIndex())return;const s=match.sides[side],n=s.cups.length;if(s.reracked||n<2||n>6||match.round.length)return;const positions=formationCoords(n,v);s.positions={};s.cups.forEach((c,i)=>s.positions[c]=positions[i]);s.reracked=true;ui.rerack=false;if(redraw)render()}
 function deathCup(){if(!match||match.kind==='training'||match.finished||match.pending)return;const shooter=match.turn;if(!confirm(`Death Cup für ${name([match.a,match.b][shooter])} als Sieger werten?`))return;snapshot();match.finished=true;match.winner=[match.a,match.b][shooter];match.round=[];match.bonus=false;render()}
