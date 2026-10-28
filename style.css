@@ -8,3 +8,27 @@
 .game-screen{max-width:640px;margin:auto}.game-title{margin:6px 0}.game-title h2{font-size:19px}.game-title .btn{padding:7px 11px;font-size:12px}.game-screen .match-summary{margin:5px 0;padding:8px 12px}.game-screen .match-summary .score{font-size:16px}.game-screen .match-notice{margin:6px 0;padding:7px 10px;font-size:12px}.table-with-actions{display:grid;grid-template-columns:minmax(0,1fr) 52px;gap:8px;align-items:center}.matchstack{width:100%;max-width:520px;gap:0;display:flex;position:relative;padding:4px 5px;border:7px solid #845738;border-radius:22px;background:linear-gradient(100deg,#103e40,#175457 47%,#103c3f);box-shadow:inset 0 0 0 2px #b18b5b,0 12px 30px #0006}.matchstack .cupfield{width:100%;height:clamp(150px,27vh,220px);min-height:0;margin:0;padding:0;border:0;border-radius:0;background:transparent}.matchstack .cups{width:290px;height:230px;max-width:none;flex-shrink:0;transform:scale(.62);transform-origin:center}.matchstack .board-top{transform:scale(.62) rotate(180deg)}.matchstack .board-top .cup{transform:translate(-50%,-50%) rotate(180deg)}.table-side-label{text-align:center;color:#f4f6f8;font-weight:800;font-size:12px;padding:2px}.table-middle-line{height:1px;width:75%;margin:auto;background:#c6e1d566}.game-actions{display:flex;flex-direction:column;align-items:stretch;gap:8px;align-self:center}.game-actions .action-icon{padding:10px 4px;font-size:20px;min-width:44px;min-height:44px}.cup.red{background:#ffb2b3;box-shadow:inset 0 0 0 7px #c72f41,0 4px 8px #0005}.cup.blue{background:#a9d4ff;box-shadow:inset 0 0 0 7px #2373d4,0 4px 8px #0005}.cup.candidate{box-shadow:0 0 0 5px #f9c44b99}.cup.pending{border-color:#68e5e3}.rerack-panel{margin:8px 0;padding:12px}.rerack-panel h3{margin:0 0 8px}.formation-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:8px;margin:8px 0}.formation-choice{background:#294650;border:2px solid #486a74;border-radius:12px;padding:4px;min-height:78px}.formation-choice svg{display:block;width:100%;height:90px}.formation-choice:hover{border-color:#ffb84d}.game-screen .match-stats{padding:8px;font-size:11px;margin:8px 0}.finish-panel{margin:8px 0}.finish-panel h2{margin:0 0 8px}.finish-panel .btn{margin:4px}
 @media(max-width:650px){.shell:has(.game-screen){padding:8px 9px 20px}.shell:has(.game-screen) .top{margin-bottom:8px}.shell:has(.game-screen) .top .brand{font-size:22px}.game-screen .match-summary .avatar{width:26px;height:26px}.matchstack{border-width:5px}.matchstack .cupfield{height:clamp(132px,25vh,188px)}.matchstack .cups{transform:scale(.54)}.matchstack .board-top{transform:scale(.54) rotate(180deg)}.table-with-actions{grid-template-columns:minmax(0,1fr) 46px;gap:5px}.game-actions .action-icon{min-width:40px;min-height:40px;font-size:18px;padding:8px 2px}.game-screen .match-summary .score{font-size:14px}.game-screen .match-summary .player{font-size:12px}}
 @media(max-height:740px) and (max-width:650px){.matchstack .cupfield{height:125px}.matchstack .cups{transform:scale(.49)}.matchstack .board-top{transform:scale(.49) rotate(180deg)}.game-screen .match-summary .row{gap:4px}.game-screen .match-notice{padding:5px 8px}}
+
+/* V1.4 – volle Tischbreite: die Bedienung liegt auf der freien Tischfläche. */
+.table-with-actions{display:block}
+.matchstack{max-width:580px;width:100%;padding-bottom:4px}
+.game-actions{position:absolute;left:7px;top:50%;transform:translateY(-50%);z-index:5;display:flex;flex-direction:column;gap:7px;margin:0}
+.game-actions .action-icon{min-width:38px;min-height:38px;padding:6px 4px;font-size:19px;background:#183a40d9;border:1px solid #6e9b9d99;color:white;box-shadow:0 2px 6px #0004}
+.matchstack .cupfield{height:clamp(175px,28vh,235px)}
+.matchstack .cups{transform:scale(.78)}
+.matchstack .board-top{transform:scale(.78) rotate(180deg)}
+.matchstack .cup{width:50px;height:50px}
+@media(max-width:650px){
+ .matchstack{border-width:5px}
+ .matchstack .cupfield{height:clamp(155px,25vh,205px)}
+ .matchstack .cups{transform:scale(.67)}
+ .matchstack .board-top{transform:scale(.67) rotate(180deg)}
+ .matchstack .cup{width:53px;height:53px}
+ .game-actions{left:3px;gap:5px}
+ .game-actions .action-icon{min-width:34px;min-height:34px;font-size:17px;padding:4px 2px}
+}
+@media(max-height:740px) and (max-width:650px){
+ .matchstack .cupfield{height:clamp(136px,23vh,170px)}
+ .matchstack .cups{transform:scale(.61)}
+ .matchstack .board-top{transform:scale(.61) rotate(180deg)}
+}
