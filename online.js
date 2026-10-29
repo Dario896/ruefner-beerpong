@@ -11,13 +11,13 @@ else {
   try {
    const {data:{user},error}=await client.auth.getUser();
    if(error&&!String(error.message).includes('Auth session missing'))throw error;
-   currentUser=user||null;$('login-form').hidden=!!user;$('register-form').hidden=!!user;$('account').hidden=!user;
+   currentUser=user||null;$('admin-panel').hidden=true;$('login-form').hidden=!!user;$('register-form').hidden=!!user;$('account').hidden=!user;
    if(!user){status('Bitte mit Benutzername oder Administrator-E-Mail anmelden.');return;}
    const {data:profile,error:pe}=await client.from('player_profiles').select('username,is_admin,is_blocked').eq('id',user.id).single();
    if(pe||!profile){status('Angemeldet, aber Profil nicht lesbar. Bitte Administrator kontaktieren.');$('account-name').textContent='Anmeldung aktiv.';return;}
    if(profile.is_blocked){await client.auth.signOut();status('Dieses Konto ist gesperrt.');return;}
    $('account-name').textContent=`${profile.username} · ${profile.is_admin?'👑 Administrator':'Spieler'}`;
-   status('Erfolgreich angemeldet! Freundschaftsspiele werden in der Haupt-App gespeichert.');
+   status('Erfolgreich angemeldet! Freundschaftsspiele werden in der Haupt-App gespeichert.');$('admin-panel').hidden=!profile.is_admin;if(profile.is_admin)await loadAdmin();
   }catch(e){status('Verbindung fehlgeschlagen: '+(e.message||'Unbekannter Fehler'));}
  }
  $('login-form').addEventListener('submit',async e=>{
@@ -44,6 +44,19 @@ else {
   }catch(err){status('Registrierung fehlgeschlagen: '+(err.message||'Unbekannter Fehler'));}
   finally{$('reg-password').value='';button.disabled=false;}
  });
+ async function loadAdmin(){
+  const msg=$('admin-status');msg.textContent='Admin-Daten werden geladen …';
+  try{
+   const {data,error}=await client.rpc('ruefner_admin_overview');if(error)throw error;
+   const players=data?.players||[],games=data?.games||[];
+   const label=id=>players.find(p=>p.id===id)?.username||'Unbekannt';
+   const table=(headers,rows)=>{const t=document.createElement('table');t.className='table';const thead=t.createTHead(),tr=thead.insertRow();headers.forEach(h=>{const th=document.createElement('th');th.textContent=h;tr.append(th)});const body=t.createTBody();rows.forEach(row=>{const r=body.insertRow();row.forEach(value=>{const c=r.insertCell();c.textContent=String(value??'–')})});return t};
+   $('admin-players').replaceChildren(table(['Spieler','Rolle','Status'],players.map(p=>[p.username,p.is_admin?'👑 Admin':'Spieler',p.is_blocked?'Gesperrt':'Aktiv'])));
+   $('admin-matches').replaceChildren(table(['Datum','Spiel','Sieger'],games.map(g=>[new Date(g.played_at).toLocaleDateString('de-CH'),label(g.player_a)+' vs. '+label(g.player_b),label(g.winner)])));
+   msg.textContent=players.length+' Spieler · '+games.length+' Online-Spiele';
+  }catch(e){msg.textContent='Admin-Übersicht nicht verfügbar: '+(e.message||'Unbekannter Fehler')+' — SQL für Schritt 2 zuerst ausführen.';}
+ }
+ $('admin-reload').addEventListener('click',loadAdmin);
  $('logout').addEventListener('click',async()=>{await client.auth.signOut();await refresh();});
  await refresh();
 }
