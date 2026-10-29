@@ -1,6 +1,6 @@
 import {createClient} from 'https://esm.sh/@supabase/supabase-js@2.49.4';
 const $=id=>document.getElementById(id);
-const status=msg=>{$('setup-status').textContent=msg;};
+const status=msg=>{const el=$('setup-status');el.textContent=msg;el.hidden=!msg;};
 const cfg=window.RUEFNER_SUPABASE;
 let currentUser=null;
 const ready=cfg?.url?.startsWith('https://')&&cfg?.publishableKey&&!cfg.publishableKey.includes('HIER_');
@@ -11,13 +11,13 @@ else {
   try {
    const {data:{user},error}=await client.auth.getUser();
    if(error&&!String(error.message).includes('Auth session missing'))throw error;
-   currentUser=user||null;$('admin-panel').hidden=true;$('login-form').hidden=!!user;$('register-form').hidden=!!user;$('account').hidden=!user;
-   if(!user){status('Bitte mit Benutzername oder Administrator-E-Mail anmelden.');return;}
+   currentUser=user||null;$('admin-panel').hidden=true;$('registration-panel').hidden=!!user;$('login-form').hidden=!!user;$('register-form').hidden=!!user;$('account').hidden=!user;
+   if(!user){status('');return;}
    const {data:profile,error:pe}=await client.from('player_profiles').select('username,is_admin,is_blocked').eq('id',user.id).single();
    if(pe||!profile){status('Angemeldet, aber Profil nicht lesbar. Bitte Administrator kontaktieren.');$('account-name').textContent='Anmeldung aktiv.';return;}
    if(profile.is_blocked){await client.auth.signOut();status('Dieses Konto ist gesperrt.');return;}
    $('account-name').textContent=`${profile.username} · ${profile.is_admin?'👑 Administrator':'Spieler'}`;
-   status('Erfolgreich angemeldet! Freundschaftsspiele werden in der Haupt-App gespeichert.');$('admin-panel').hidden=!profile.is_admin;if(profile.is_admin)await loadAdmin();
+   status('');$('admin-panel').hidden=!profile.is_admin;if(profile.is_admin)await loadAdmin();else window.location.replace('./');
   }catch(e){status('Verbindung fehlgeschlagen: '+(e.message||'Unbekannter Fehler'));}
  }
  $('login-form').addEventListener('submit',async e=>{
