@@ -52,7 +52,7 @@ else {
   finally{$('reg-password').value='';button.disabled=false;}
  });
 
- let adminPlayers=[],adminGames=[],visibleGames=5,searchTerm='';
+ let adminPlayers=[],activePlayers=[],adminGames=[],visibleGames=5,searchTerm='';
  async function adminAction(action,payload={}){
   const {data:{session}}=await client.auth.getSession();
   if(!session?.access_token)throw Error('Bitte erneut anmelden.');
@@ -75,7 +75,7 @@ else {
  const label=id=>adminPlayers.find(p=>p.id===id)?.username||'Unbekannt';
  function showPlayers(){
   const root=$('admin-players');root.replaceChildren();
-  for(const p of adminPlayers){
+  for(const p of activePlayers){
    const box=el('div',undefined,'notice');
    const title=el('strong',p.username+(p.is_admin?' 👑':'')+(p.is_blocked?' · Gesperrt':''));box.append(title);
    if(!p.is_admin){
@@ -175,10 +175,13 @@ else {
   const msg=$('admin-status');msg.textContent='Admin-Daten werden geladen …';
   try{
    const {data,error}=await client.rpc('ruefner_admin_overview');if(error)throw error;
-   adminPlayers=(data?.players||[]).filter(p=>!p.is_deleted);adminGames=data?.games||[];
+   const deleted=await adminAction('list-deleted-players');
+   const deletedIds=new Set(deleted.deletedIds||[]);
+   adminPlayers=data?.players||[];adminGames=data?.games||[];
+   activePlayers=adminPlayers.filter(p=>!deletedIds.has(p.id));
    showPlayers();showGames();
    const invites=await adminAction('list-invites');showInvites(invites.invites||[]);
-   msg.textContent=adminPlayers.length+' Spieler · '+adminGames.length+' Online-Spiele';
+   msg.textContent=activePlayers.length+' Spieler · '+adminGames.length+' Online-Spiele';
   }catch(e){msg.textContent='Admin-Zentrale: '+(e.message||'Unbekannter Fehler');}
  }
  $('invite-create').addEventListener('click',async()=>{
