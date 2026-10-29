@@ -119,7 +119,7 @@ else {
   let search=document.getElementById('game-search');
   if(!search){
    search=el('input');search.id='game-search';search.placeholder='🔎 Spieler oder Datum suchen';
-   search.style.marginBottom='12px';search.style.width='100%';search.style.maxWidth='560px';search.style.boxSizing='border-box';
+   search.style.display='block';search.style.marginBottom='12px';search.style.width='100%';search.style.maxWidth='none';search.style.minWidth='0';search.style.boxSizing='border-box';
    search.addEventListener('input',()=>{searchTerm=search.value;visibleGames=5;showGames()});
   }
   search.value=searchTerm;root.append(search);
