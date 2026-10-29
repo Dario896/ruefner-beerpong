@@ -32,7 +32,7 @@ function reigningChampion(){const finished=db.leagues.filter(l=>l.closed&&champi
 function go(v){view=v;ui={};render()}
 function btn(text,fn,cls=''){return `<button class="btn ${cls}" onclick="${fn}">${text}</button>`}
 function header(){return `<div class="top"><div class="brand" onclick="go('home')" style="cursor:pointer">🏓 Rüfner <span>Beer Pong</span></div><div class="row">${db.current?`<span class="pill">${esc(name(db.current))}${reigningChampion()===db.current?' 👑':''}</span>`:''}<a class="btn secondary" style="text-decoration:none" href="online.html">🔐 Online</a>${btn('☰ Menü',"go('home')",'secondary')}</div></div>`}
-function render(){const root=document.getElementById('app');let body='';try{body=({home,profiles,training,friendship,league,stats,playerStats,rules,game,history,firstThrow})[view]?.()||home()}catch(e){body=`<div class="notice">Fehler: ${esc(e.message)}</div>${btn('Zurück',"go('home')")}`};root.innerHTML=`<div class="shell">${header()}${body}<footer>Rüfner Beer Pong · V2.7 · Freundschaftsspiele online · Training und Liga noch lokal</footer></div>`}
+function render(){const root=document.getElementById('app');let body='';try{body=({home,profiles,training,friendship,league,stats,playerStats,rules,game,history,firstThrow})[view]?.()||home()}catch(e){body=`<div class="notice">Fehler: ${esc(e.message)}</div>${btn('Zurück',"go('home')")}`};root.innerHTML=`<div class="shell">${header()}${body}<footer>Rüfner Beer Pong · V2.8 · Schritt 1 · Freundschaftsspiele online · Training und Liga noch lokal</footer></div>`}
 function home(){return `<section class="hero"><div class="eyebrow">Die Liga beginnt hier</div><h1>Becher. Bomben. Ruhm. 🍻</h1><p>Training gegen Rüfner 3000, echte Duelle und Premier League.</p>${db.current?`<div class="row">${avatar(db.current)}<strong>Willkommen zurück, ${esc(name(db.current))}! 🍻</strong></div>`:`<div class="notice">Erstelle zuerst ein Spielerprofil und wähle es aus.</div>`}</section><div class="grid">${[['🤖','Training','Du gegen Rüfner 3000. Privat, ohne Statistik.','training'],['🏓','Freundschaftsspiel','Echte Duelle mit gemeinsamer Statistik.','friendship'],['🏆','Premier League','15 Nights und ein grosses Finale.','league'],['📊','Statistiken','Ranglisten, Bomben und direkte Duelle.','stats'],['👤','Profile','Spieler verwalten und Profilbild ändern.','profiles'],['📖','Regeln','Das Rüfner Beer Pong Reglement.','rules']].map(a=>`<button class="card action" onclick="go('${a[3]}')"><div class="emoji">${a[0]}</div><h3>${a[1]}</h3><p>${a[2]}</p></button>`).join('')}</div>`}
 function profiles(){return `<div class="section"><h2>👤 Spielerprofile</h2><p class="muted">Lokale Profile und geladene Online-Spieler. Freundschaftsspiele werden online gespeichert, Training und Liga bleiben lokal.</p></div><div class="panel"><h3>Neues Profil</h3><div class="field"><label>Spielername</label><input id="newName" maxlength="28" placeholder="Name"></div>${btn('Profil erstellen','createProfile()')}</div><div class="grid">${db.players.map(p=>`<div class="card"><div class="row">${avatar(p.id)}<strong>${esc(p.name)}${reigningChampion()===p.id?' 👑':''}</strong>${p.id===db.admin?'<span class="badge">Host</span>':''}</div><div class="row" style="margin-top:14px">${btn(p.id===db.current?'✓ Aktiv':'Profil auswählen',`selectProfile('${p.id}')`,p.id===db.current?'secondary':'')}${isAdmin()?btn('Name ändern',`renameProfile('${p.id}')`,'secondary'):''}</div>${p.id===db.current?`<div class="field"><label>Profilbild ändern</label><input type="file" accept="image/*" onchange="photoProfile(event,'${p.id}')"></div>`:''}</div>`).join('')}</div>`}
 function createProfile(){const el=document.getElementById('newName'),n=el.value.trim();if(n.length<2)return alert('Bitte mindestens 2 Zeichen eingeben.');if(db.players.some(p=>p.name.toLowerCase()===n.toLowerCase()))return alert('Name bereits vergeben.');const p={id:id(),name:n,photo:''};db.players.push(p);if(!db.admin)db.admin=p.id;db.current=p.id;save();render()}
@@ -126,13 +126,25 @@ async function loadCloudResults(force=false){
  finally{cloudResultsLoading=false;if(view==='stats')render();}
 }
 function refreshCloudResults(){cloudResultsLoaded=false;loadCloudResults(true);}
+// V2.8: Rollierende Statistikzeiträume. 'Letztes Jahr' bedeutet 365 Tage.
+let statsPeriod='30';
+function inStatsPeriod(date){
+ if(statsPeriod==='all')return true;
+ const t=Date.parse(date);
+ if(!Number.isFinite(t))return false;
+ const age=Date.now()-t;
+ return age>=0&&age<=Number(statsPeriod)*86400000;
+}
+function periodControls(){return `<div class="panel"><div class="row">${[['30','🔥 Letzte 30 Tage'],['365','📅 Letztes Jahr'],['all','🏆 Gesamt']].map(([value,label])=>btn(label,`setStatsPeriod('${value}')`,statsPeriod===value?'':'secondary')).join('')}</div></div>`;}
+function setStatsPeriod(value){if(!['30','365','all'].includes(value))return;statsPeriod=value;render();}
 function cloudStatsTable(){
  if(!onlineDirectoryLoaded&&!onlineDirectoryLoading&&!onlineDirectoryError)setTimeout(loadOnlinePlayers,0);
  if(!cloudResultsLoaded&&!cloudResultsLoading&&!cloudResultsError)setTimeout(loadCloudResults,0);
- const n=cloudResults.length,status=cloudResultsLoading?'Online-Statistik wird geladen …':cloudResultsError||(n===1?'1 Spiel':n+' Spiele');
+ const periodResults=cloudResults.filter(g=>inStatsPeriod(g.played_at));
+  const n=periodResults.length,status=cloudResultsLoading?'Online-Statistik wird geladen …':cloudResultsError||(n===1?'1 Spiel':n+' Spiele');
  const players=db.players.filter(p=>p.onlineId);
  const rows=players.map(p=>{
-  const gs=cloudResults.filter(g=>g.player_a===p.onlineId||g.player_b===p.onlineId);
+  const gs=periodResults.filter(g=>g.player_a===p.onlineId||g.player_b===p.onlineId);
   let wins=0,bombs=0,shots=0,hits=0,combos=0,diff=0;
   for(const g of gs){
    const isA=g.player_a===p.onlineId,s=isA?g.side_a:g.side_b,opp=isA?g.side_b:g.side_a;
@@ -151,19 +163,21 @@ function formatAvg(cups,turns){return turns>0?(cups/turns).toFixed(2):'–';}
 function playerStats(){
  const pid=ui.playerStats,p=db.players.find(p=>p.onlineId===pid);
  if(!p)return `<div class="notice">Spieler nicht gefunden.</div>${btn('← Zurück',"go('stats')")}`;
- const gs=cloudResults.filter(g=>g.player_a===pid||g.player_b===pid);
+ const gs=cloudResults.filter(g=>inStatsPeriod(g.played_at)&&(g.player_a===pid||g.player_b===pid));
+  const allGs=cloudResults.filter(g=>g.player_a===pid||g.player_b===pid);
  let shots=0,hits=0,trickAttempts=0,trickHits=0,finishAttempts=0,finishHits=0,normalFinishes=0,comboFinishes=0,bombFinishes=0,bombs=0,combos=0,turns=0,cups=0;
  let bestWin=null,bestLoss=null,complete=0;
- for(const g of gs){
-  const isA=g.player_a===pid,s=isA?g.side_a:g.side_b,opp=isA?g.side_b:g.side_a;
-  shots+=Number(s?.shots)||0;hits+=Number(s?.hits)||0;
-  bombs+=Number(s?.bombs)||0;combos+=Number(s?.combos)||0;
-  const fields=['trickAttempts','trickHits','finishAttempts','finishHits','normalFinishes','comboFinishes','bombFinishes'];
-  for(const k of fields)if(Number.isFinite(Number(s?.[k])))evalStat(k,Number(s[k]));
+ for(const g of allGs){
+   const isA=g.player_a===pid,s=isA?g.side_a:g.side_b,opp=isA?g.side_b:g.side_a;
+   const inPeriod=inStatsPeriod(g.played_at);
+   if(inPeriod){shots+=Number(s?.shots)||0;hits+=Number(s?.hits)||0;}
+   if(inPeriod){bombs+=Number(s?.bombs)||0;combos+=Number(s?.combos)||0;}
+   const fields=['trickAttempts','trickHits','finishAttempts','finishHits','normalFinishes','comboFinishes','bombFinishes'];
+   if(inPeriod)for(const k of fields)if(s?.[k]!=null&&Number.isFinite(Number(s[k])))evalStat(k,Number(s[k]));
   function evalStat(k,v){switch(k){case 'trickAttempts':trickAttempts+=v;break;case 'trickHits':trickHits+=v;break;case 'finishAttempts':finishAttempts+=v;break;case 'finishHits':finishHits+=v;break;case 'normalFinishes':normalFinishes+=v;break;case 'comboFinishes':comboFinishes+=v;break;case 'bombFinishes':bombFinishes+=v;break;}}
   if(typeof s?.turns==='number'&&s.turns>0){
    const c=10-(Number(opp?.remaining)||0),t=s.turns,avg=c/t;
-   cups+=c;turns+=t;complete++;
+    if(inPeriod){cups+=c;turns+=t;complete++;}
    const rec={avg,opponent:(db.players.find(p=>p.onlineId===(isA?g.player_b:g.player_a))?.name||'Unbekannt'),date:g.played_at};
    if(g.winner===pid){if(!bestWin||avg>bestWin.avg)bestWin=rec;}
    else if(!bestLoss||avg>bestLoss.avg)bestLoss=rec;
@@ -177,7 +191,7 @@ function playerStats(){
  card('🏆 Average',row('Gesamt-AVG',formatAvg(cups,turns))+row('Höchster Winning-AVG',rec(bestWin))+row('Höchster Losing-AVG',rec(bestLoss)),true)+
  card('🎯 Wurfstatistik',row('Geworfene Bälle',shots)+row('Treffer',hits)+row('Trefferquote',formatPct(hits,shots))+row('Trickshot-Versuche',trickAttempts||complete?trickAttempts:'–')+row('Trickshot-Trefferquote',formatPct(trickHits,trickAttempts)))+
  card('🏁 Finishstatistik',row('Finishversuche',finishAttempts||complete?finishAttempts:'–')+row('Erfolgreiche Finishes',finishHits||complete?finishHits:'–')+row('Finishquote',formatPct(finishHits,finishAttempts))+row('Normale Finishes',normalFinishes||complete?normalFinishes:'–')+row('Kombifinishes',comboFinishes||complete?comboFinishes:'–')+row('Bombenfinishes',bombFinishes||complete?bombFinishes:'–'))+
- card('💣 Spezialstatistik',row('Bomben',bombs)+row('Kombinationen',combos)+row('Becherdifferenz',gs.reduce((v,g)=>{const a=g.player_a===pid,s=a?g.side_a:g.side_b,o=a?g.side_b:g.side_a;return v+(Number(s?.remaining)||0)-(Number(o?.remaining)||0)},0)))+
+ card('💣 Spezialstatistik',row('Bomben',bombs)+row('Kombinationen',combos)+row('Becherdifferenz',(()=>{const d=gs.reduce((v,g)=>{const a=g.player_a===pid,s=a?g.side_a:g.side_b,o=a?g.side_b:g.side_a;return v+(Number(s?.remaining)||0)-(Number(o?.remaining)||0)},0);return (d>0?'+':'')+d})()))+
  (complete<gs.length?`<p class="muted">Hinweis: Average und neue Detailwerte sind nur für die ${complete} Spiele ab V2.7 verfügbar. Ältere Ergebnisse bleiben erhalten.</p>`:'');
 }
 async function saveFriendlyOnline(g){
@@ -440,7 +454,7 @@ function finalNight(l){const rows=leagueStandings(l),gs=nightGames(l,16);return 
 function champion(l){return leagueGames(l).find(g=>g.ref?.stage==='final16')?.winner}
 function showArchived(i){const l=db.leagues.find(x=>x.id===i);if(!l)return;ui.archive=i;document.getElementById('app').innerHTML=`<div class="shell">${header()}${btn('← Zurück',"go('league')",'secondary')}${leagueDetail(l)}</div>`}
 function history(){return `<h2>Spiele</h2>${db.games.map(g=>`<div class="panel">${esc(name(g.a))} gegen ${esc(name(g.b))} · ${esc(name(g.winner))} gewinnt</div>`).join('')}`}
-function stats(){const friend=db.games.filter(g=>g.kind==='friendly'),rows=db.players.map(p=>{const gs=friend.filter(g=>g.a===p.id||g.b===p.id);let wins=0,bombs=0,shots=0,hits=0,combos=0,diff=0;for(const g of gs){const i=g.a===p.id?0:1,s=g.sides[i];wins+=g.winner===p.id?1:0;bombs+=s.bombs;shots+=s.shots;hits+=s.hits;combos+=s.combos;diff+=s.remaining-g.sides[1-i].remaining}return {p,games:gs.length,wins,bombs,shots,hits,combos,diff}}).sort((a,b)=>b.wins-a.wins||b.diff-a.diff);return `${cloudStatsTable()}<div class="section"><h2>📱 Lokale Freundschaftsstatistik (nur dieses Gerät)</h2></div><div class="panel table-wrap"><table class="table"><thead><tr><th>Spieler</th><th>Spiele</th><th>Siege</th><th>Quote</th><th>💣</th><th>Kombi</th><th>+/-</th></tr></thead><tbody>${rows.map(x=>`<tr><td>${esc(x.p.name)}</td><td>${x.games}</td><td>${x.wins}</td><td>${x.shots?(100*x.hits/x.shots).toFixed(1)+' %':'–'}</td><td>${x.bombs}</td><td>${x.combos}</td><td>${x.diff}</td></tr>`).join('')}</tbody></table></div><div class="section"><h2>🤖 Höchster besiegter Rüfner 3000</h2></div><div class="panel">${db.players.map(p=>`<p>${esc(p.name)}: <strong>${COM_NAMES[db.record[p.id]]||'Noch keiner'}</strong></p>`).join('')}</div><div class="section"><h2>🏆 Premier-League-Titel</h2></div><div class="panel">${db.players.map(p=>`<p>${esc(p.name)}: ${db.leagues.filter(l=>l.closed&&champion(l)===p.id).length} Meistertitel</p>`).join('')}</div>`}
+function stats(){const friend=db.games.filter(g=>g.kind==='friendly'&&inStatsPeriod(g.date)),rows=db.players.map(p=>{const gs=friend.filter(g=>g.a===p.id||g.b===p.id);let wins=0,bombs=0,shots=0,hits=0,combos=0,diff=0;for(const g of gs){const i=g.a===p.id?0:1,s=g.sides[i];wins+=g.winner===p.id?1:0;bombs+=s.bombs;shots+=s.shots;hits+=s.hits;combos+=s.combos;diff+=s.remaining-g.sides[1-i].remaining}return {p,games:gs.length,wins,bombs,shots,hits,combos,diff}}).sort((a,b)=>b.wins-a.wins||b.diff-a.diff);return `${periodControls()}${cloudStatsTable()}<div class="section"><h2>📱 Lokale Freundschaftsstatistik (nur dieses Gerät)</h2></div><div class="panel table-wrap"><table class="table"><thead><tr><th>Spieler</th><th>Spiele</th><th>Siege</th><th>Quote</th><th>💣</th><th>Kombi</th><th>+/-</th></tr></thead><tbody>${rows.map(x=>`<tr><td>${esc(x.p.name)}</td><td>${x.games}</td><td>${x.wins}</td><td>${x.shots?(100*x.hits/x.shots).toFixed(1)+' %':'–'}</td><td>${x.bombs}</td><td>${x.combos}</td><td>${x.diff>0?'+':''}${x.diff}</td></tr>`).join('')}</tbody></table></div><div class="section"><h2>🤖 Höchster besiegter Rüfner 3000</h2></div><div class="panel">${db.players.map(p=>`<p>${esc(p.name)}: <strong>${COM_NAMES[db.record[p.id]]||'Noch keiner'}</strong></p>`).join('')}</div><div class="section"><h2>🏆 Premier-League-Titel</h2></div><div class="panel">${db.players.map(p=>`<p>${esc(p.name)}: ${db.leagues.filter(l=>l.closed&&champion(l)===p.id).length} Meistertitel</p>`).join('')}</div>`}
 function rules(){const sections=[['Aufstellen','10 Becher in Pyramidenform (4–3–2–1), mittig und ca. 10 cm von der Tischkante.'],['Anspiel','Ein Team beginnt mit zwei Würfen. Bei Uneinigkeit: Schere, Stein, Papier.'],['Werfen','Pro Team zwei Bälle pro Runde. Der Ellenbogen bleibt hinter der Tischkante.'],['Abwehren','Nicht direkte Würfe dürfen abgewehrt werden; direkte Würfe nicht. Bälle im Becher dürfen nicht herausgeblasen werden.'],['Kombinationen','Zwei unterschiedliche Becher: beide weg und zwei neue Würfe. Derselbe Becher: Bombe, dieser und drei nächstgelegene Becher weg, danach zwei neue Würfe.'],['Trickshot','Kommt der Ball ohne Fremdeinwirkung über die Tischmitte zurück, gibt es einen Trickshot.'],['Death Cup','Treffer in einen bereits getroffenen, aber noch stehenden Becher beendet das Spiel sofort.'],['Eigentor & umfallende Becher','Eigentore und umgefallene Becher haben eigene Strafregeln.'],['Zusammenstellen','Einmal pro Spiel, zu Beginn eines regulären eigenen Wurfs – niemals während einer Kombination oder ihrer Zusatzwürfe. Bei 6 Bechern grosse Pyramide; 5 Full House (3 Varianten); 4 Vagina; 3 kleine Pyramide; 2 Paar (3 Varianten).'],['Trinken','Getroffene Becher werden ausgetrunken; die Originalregeln enthalten zusätzliche Zeit- und Strafbestimmungen.']];return `<div class="section"><h2>📖 Rüfner Beer Pong Reglement</h2><p class="muted">Kurzübersicht. Das vollständige Originaldokument liegt der App bei.</p></div>${sections.map(([h,p])=>`<details><summary>${h}</summary><p>${p}</p></details>`).join('')}<div class="panel"><a class="btn" style="display:inline-block;text-decoration:none" href="reglement.pdf" target="_blank" rel="noopener">📄 Vollständiges Reglement (PDF)</a></div>`}
 render();
-if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('./sw.js?v=26').catch(()=>{});
+if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('./sw.js?v=28').catch(()=>{});
