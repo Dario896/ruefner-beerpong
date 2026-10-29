@@ -35,7 +35,7 @@ let onlineNavRole=null,onlineNavName='';
 function header(){return `<div class="top"><div class="brand" onclick="go('home')" style="cursor:pointer">🏓 Rüfner <span>Beer Pong</span></div><div class="row">${db.current?`<span class="pill">${esc(name(db.current))}${reigningChampion()===db.current?' 👑':''}</span>`:''}${onlineNavRole==='player'?`<a class="btn secondary" style="text-decoration:none" href="online.html?logout=1">👤 ${esc(onlineNavName)} · Abmelden</a>`:`<a class="btn secondary" style="text-decoration:none" href="online.html">${onlineNavRole==='admin'?'👑 Admin':'🔐 Online'}</a>`}${btn('☰ Menü',"go('home')",'secondary')}</div></div>`}
 function render(){const root=document.getElementById('app');let body='';try{body=({home,profiles,training,friendship,league,stats,playerStats,rules,game,history,firstThrow})[view]?.()||home()}catch(e){body=`<div class="notice">Fehler: ${esc(e.message)}</div>${btn('Zurück',"go('home')")}`};root.innerHTML=`<div class="shell">${header()}${body}<footer>Rüfner Beer Pong · V2.8 · Schritt 1 · Freundschaftsspiele online · Training und Liga noch lokal</footer></div>`}
 function home(){return `<section class="hero"><div class="eyebrow">Die Liga beginnt hier</div><h1>Becher. Bomben. Ruhm. 🍻</h1><p>Training gegen Rüfner 3000, echte Duelle und Premier League.</p>${db.current?`<div class="row">${avatar(db.current)}<strong>Willkommen zurück, ${esc(name(db.current))}! 🍻</strong></div>`:`<div class="notice">Erstelle zuerst ein Spielerprofil und wähle es aus.</div>`}</section><div class="grid">${[['🤖','Training','Du gegen Rüfner 3000. Privat, ohne Statistik.','training'],['🏓','Freundschaftsspiel','Echte Duelle mit gemeinsamer Statistik.','friendship'],['🏆','Premier League','15 Nights und ein grosses Finale.','league'],['📊','Statistiken','Ranglisten, Bomben und direkte Duelle.','stats'],['👤','Profile','Spieler verwalten und Profilbild ändern.','profiles'],['📖','Regeln','Das Rüfner Beer Pong Reglement.','rules']].map(a=>`<button class="card action" onclick="go('${a[3]}')"><div class="emoji">${a[0]}</div><h3>${a[1]}</h3><p>${a[2]}</p></button>`).join('')}</div>`}
-function profiles(){return `<div class="section"><h2>👤 Spielerprofile</h2><p class="muted">Lokale Profile und geladene Online-Spieler. Freundschaftsspiele werden online gespeichert, Training und Liga bleiben lokal.</p></div><div class="panel"><h3>Neues Profil</h3><div class="field"><label>Spielername</label><input id="newName" maxlength="28" placeholder="Name"></div>${btn('Profil erstellen','createProfile()')}</div><div class="grid">${db.players.map(p=>`<div class="card"><div class="row">${avatar(p.id)}<strong>${esc(p.name)}${reigningChampion()===p.id?' 👑':''}</strong>${p.id===db.admin?'<span class="badge">Host</span>':''}</div><div class="row" style="margin-top:14px">${btn(p.id===db.current?'✓ Aktiv':'Profil auswählen',`selectProfile('${p.id}')`,p.id===db.current?'secondary':'')}${isAdmin()?btn('Name ändern',`renameProfile('${p.id}')`,'secondary'):''}</div>${p.id===db.current?`<div class="field"><label>Profilbild ändern</label><input type="file" accept="image/*" onchange="photoProfile(event,'${p.id}')"></div>`:''}</div>`).join('')}</div>`}
+function profiles(){return `<div class="section"><h2>👤 Spielerprofile</h2><p class="muted">Lokale Profile und geladene Online-Spieler. Freundschaftsspiele werden online gespeichert, Training und Liga bleiben lokal.</p></div><div class="panel"><h3>Neues Profil</h3><div class="field"><label>Spielername</label><input id="newName" maxlength="28" placeholder="Name"></div>${btn('Profil erstellen','createProfile()')}</div><div class="grid">${db.players.filter(p=>!p.isDeleted).map(p=>`<div class="card"><div class="row">${avatar(p.id)}<strong>${esc(p.name)}${reigningChampion()===p.id?' 👑':''}</strong>${p.id===db.admin?'<span class="badge">Host</span>':''}</div><div class="row" style="margin-top:14px">${btn(p.id===db.current?'✓ Aktiv':'Profil auswählen',`selectProfile('${p.id}')`,p.id===db.current?'secondary':'')}${isAdmin()?btn('Name ändern',`renameProfile('${p.id}')`,'secondary'):''}</div>${p.id===db.current?`<div class="field"><label>Profilbild ändern</label><input type="file" accept="image/*" onchange="photoProfile(event,'${p.id}')"></div>`:''}</div>`).join('')}</div>`}
 function createProfile(){const el=document.getElementById('newName'),n=el.value.trim();if(n.length<2)return alert('Bitte mindestens 2 Zeichen eingeben.');if(db.players.some(p=>p.name.toLowerCase()===n.toLowerCase()))return alert('Name bereits vergeben.');const p={id:id(),name:n,photo:''};db.players.push(p);if(!db.admin)db.admin=p.id;db.current=p.id;save();render()}
 function selectProfile(i){db.current=i;save();render()}
 function renameProfile(i){if(!isAdmin())return;const n=prompt('Neuer Name:',name(i))?.trim();if(!n)return;if(db.players.some(p=>p.id!==i&&p.name.toLowerCase()===n.toLowerCase()))return alert('Name bereits vergeben.');player(i).name=n;save();render()}
@@ -62,7 +62,7 @@ async function loadOnlinePlayers(){
    return;
   }
   const {data:profiles,error}=await client.from('player_profiles')
-   .select('id,username,is_blocked').eq('is_blocked',false).order('username');
+   .select('id,username,is_blocked,is_deleted').order('username');
   if(error)throw error;
   if(!Array.isArray(profiles))throw Error('Keine Spielerliste erhalten.');
   let changed=false;
@@ -71,8 +71,10 @@ async function loadOnlinePlayers(){
    const existing=db.players.find(x=>x.name.toLocaleLowerCase('de')===p.username.toLocaleLowerCase('de'));
    if(existing){
     if(existing.onlineId!==p.id){existing.onlineId=p.id;changed=true;}
+     if(existing.isDeleted!==!!p.is_deleted){existing.isDeleted=!!p.is_deleted;changed=true;}
+     if(existing.name!==p.username){existing.name=p.username;changed=true;}
    }else{
-    db.players.push({id:'online-'+p.id,onlineId:p.id,name:p.username,photo:''});
+    db.players.push({id:'online-'+p.id,onlineId:p.id,name:p.username,photo:'',isDeleted:!!p.is_deleted});
     changed=true;
    }
   }
@@ -143,7 +145,7 @@ function cloudStatsTable(){
  if(!cloudResultsLoaded&&!cloudResultsLoading&&!cloudResultsError)setTimeout(loadCloudResults,0);
  const periodResults=cloudResults.filter(g=>inStatsPeriod(g.played_at));
   const n=periodResults.length,status=cloudResultsLoading?'Online-Statistik wird geladen …':cloudResultsError||(n===1?'1 Spiel':n+' Spiele');
- const players=db.players.filter(p=>p.onlineId);
+ const players=db.players.filter(p=>p.onlineId&&!p.isDeleted);
  const rows=players.map(p=>{
   const gs=periodResults.filter(g=>g.player_a===p.onlineId||g.player_b===p.onlineId);
   let wins=0,bombs=0,shots=0,hits=0,combos=0,diff=0;
@@ -156,14 +158,14 @@ function cloudStatsTable(){
   }
   return {p,games:gs.length,wins,bombs,shots,hits,combos,diff};
  }).sort((a,b)=>b.wins-a.wins||b.diff-a.diff);
- return `<div class="section"><h2>🌐 Gemeinsame Freundschaftsstatistik</h2></div><div class="panel"><p class="muted">${esc(status)} ${btn('↻ Aktualisieren','refreshCloudResults()','secondary')}</p>${cloudResultsError?'<p class="muted">Bitte online anmelden.</p>':''}<div class="table-wrap"><table class="table"><thead><tr><th>Spieler</th><th>Spiele</th><th>Siege</th><th>Quote</th><th>💣</th><th>Kombi</th><th>+/-</th></tr></thead><tbody>${rows.map(x=>`<tr><td><button class="btn secondary" onclick="openPlayerStats('${x.p.onlineId}')">${esc(x.p.name)} ›</button></td><td>${x.games}</td><td>${x.wins}</td><td>${x.shots?(100*x.hits/x.shots).toFixed(1)+' %':'–'}</td><td>${x.bombs}</td><td>${x.combos}</td><td>${x.diff>0?'+':''}${x.diff}</td></tr>`).join('')}</tbody></table></div></div>`;
+ return `<div class="section"><h2>🌐 Spielstatistik · Online-Freundschaftsspiele</h2></div><div class="panel"><p class="muted">${esc(status)} ${btn('↻ Aktualisieren','refreshCloudResults()','secondary')}</p>${cloudResultsError?'<p class="muted">Bitte online anmelden.</p>':''}<div class="table-wrap"><table class="table"><thead><tr><th>Spieler</th><th>Spiele</th><th>Siege</th><th>Quote</th><th>💣</th><th>Kombi</th><th>+/-</th></tr></thead><tbody>${rows.map(x=>`<tr><td><button class="btn secondary" onclick="openPlayerStats('${x.p.onlineId}')">${esc(x.p.name)} ›</button></td><td>${x.games}</td><td>${x.wins}</td><td>${x.shots?(100*x.hits/x.shots).toFixed(1)+' %':'–'}</td><td>${x.bombs}</td><td>${x.combos}</td><td>${x.diff>0?'+':''}${x.diff}</td></tr>`).join('')}</tbody></table></div></div>`;
 }
 function openPlayerStats(onlineId){ui.playerStats=onlineId;view='playerStats';render();}
 function formatPct(n,d){return d?(100*n/d).toFixed(1)+' %':'–';}
 function formatAvg(cups,turns){return turns>0?(cups/turns).toFixed(2):'–';}
 function playerStats(){
  const pid=ui.playerStats,p=db.players.find(p=>p.onlineId===pid);
- if(!p)return `<div class="notice">Spieler nicht gefunden.</div>${btn('← Zurück',"go('stats')")}`;
+ if(!p||p.isDeleted)return `<div class="notice">Spieler nicht gefunden.</div>${btn('← Zurück',"go('stats')")}`;
  const gs=cloudResults.filter(g=>inStatsPeriod(g.played_at)&&(g.player_a===pid||g.player_b===pid));
   const allGs=cloudResults.filter(g=>g.player_a===pid||g.player_b===pid);
  let shots=0,hits=0,trickAttempts=0,trickHits=0,finishAttempts=0,finishHits=0,normalFinishes=0,comboFinishes=0,bombFinishes=0,bombs=0,combos=0,turns=0,cups=0;
@@ -221,7 +223,7 @@ function friendship(){
  const directoryMessage=onlineDirectoryLoading?'Online-Spieler werden geladen …':onlineDirectoryError||'Online-Spieler geladen.';
  return `<div class="section"><h2>🏓 Freundschaftsspiel</h2><p class="muted">Ein Handy genügt. Freundschaftsspiele werden online gespeichert. Bitte vorher online anmelden.</p></div><div class="panel"><p class="muted">${esc(directoryMessage)} ${btn('↻ Spieler aktualisieren','reloadOnlinePlayers()','secondary')}</p>${pairPicker()}${btn('Spiel starten',"startFriendly()")}</div>`;
 }
-function pairPicker(ids){const ps=ids||db.players.filter((p,i,arr)=>arr.findIndex(q=>q.name.toLocaleLowerCase('de')===p.name.toLocaleLowerCase('de'))===i).map(p=>p.id);return `<div class="field"><label>Spieler 1</label><select id="p1">${ps.map(p=>`<option value="${p}">${esc(name(p))}</option>`).join('')}</select></div><div class="field"><label>Spieler 2</label><select id="p2">${ps.map((p,i)=>`<option value="${p}" ${i===1?'selected':''}>${esc(name(p))}</option>`).join('')}</select></div>`}
+function pairPicker(ids){const ps=ids||db.players.filter(p=>!p.isDeleted).filter((p,i,arr)=>arr.findIndex(q=>q.name.toLocaleLowerCase('de')===p.name.toLocaleLowerCase('de'))===i).map(p=>p.id);return `<div class="field"><label>Spieler 1</label><select id="p1">${ps.map(p=>`<option value="${p}">${esc(name(p))}</option>`).join('')}</select></div><div class="field"><label>Spieler 2</label><select id="p2">${ps.map((p,i)=>`<option value="${p}" ${i===1?'selected':''}>${esc(name(p))}</option>`).join('')}</select></div>`}
 function startTraining(){if(!requireProfile())return;startMatch(db.current,'COM','training',null,Number(document.getElementById('difficulty').value))}
 function startFriendly(){if(db.players.length<2)return alert('Erstelle zuerst mindestens zwei Profile.');const a=document.getElementById('p1').value,b=document.getElementById('p2').value;if(a===b)return alert('Bitte zwei unterschiedliche Spieler wählen.');startMatch(a,b,'friendly')}
 function newSide(){return {turns:0,finishAttempts:0,finishHits:0,normalFinishes:0,comboFinishes:0,bombFinishes:0,trickAttempts:0,trickHits:0,cups:Array.from({length:10},(_,i)=>i),layout:10,positions:formationCoords(10,0),reracked:false,shots:0,hits:0,bombs:0,combos:0}}
@@ -465,8 +467,8 @@ if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.
  try{
   const cfg=window.RUEFNER_SUPABASE;if(!cfg?.url||!cfg?.publishableKey)return;
   const client=await getCloudClient();const {data:{user}}=await client.auth.getUser();if(!user)return;
-  const {data:profile,error}=await client.from('player_profiles').select('username,is_admin,is_blocked').eq('id',user.id).single();
-  if(error||!profile||profile.is_blocked)return;
+  const {data:profile,error}=await client.from('player_profiles').select('username,is_admin,is_blocked,is_deleted').eq('id',user.id).single();
+  if(error||!profile||profile.is_blocked||profile.is_deleted)return;
   onlineNavRole=profile.is_admin?'admin':'player';onlineNavName=profile.username;render();
  }catch(e){/* Ohne Verbindung bleibt die Anmeldung erreichbar. */}
 })();
