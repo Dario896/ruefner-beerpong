@@ -68,7 +68,7 @@ async function loadOnlinePlayers(){
   let changed=false;
   for(const p of profiles){
    if(!p.id||!p.username)continue;
-   const existing=db.players.find(x=>x.name.toLocaleLowerCase('de')===p.username.toLocaleLowerCase('de'));
+   const existing=db.players.find(x=>x.onlineId===p.id)||db.players.find(x=>x.name.toLocaleLowerCase('de')===p.username.toLocaleLowerCase('de'));
    if(existing){
     if(existing.onlineId!==p.id){existing.onlineId=p.id;changed=true;}
      if(existing.isDeleted!==!!p.is_deleted){existing.isDeleted=!!p.is_deleted;changed=true;}
@@ -76,6 +76,12 @@ async function loadOnlinePlayers(){
    }else{
     db.players.push({id:'online-'+p.id,onlineId:p.id,name:p.username,photo:'',isDeleted:!!p.is_deleted});
     changed=true;
+   }
+   // Auch alte lokale Profile gleichen Namens ausblenden; Spiele und Ligen bleiben gespeichert.
+   for(const local of db.players){
+    if(local.name.toLocaleLowerCase('de')===p.username.toLocaleLowerCase('de') && local.isDeleted!==!!p.is_deleted){
+     local.isDeleted=!!p.is_deleted;changed=true;
+    }
    }
   }
   if(changed)save();
@@ -462,7 +468,7 @@ function leagueStatsOverview(){
  const leagues=db.leagues;
  if(!leagues.length)return `<div class="section"><h2>🏆 Premier-League-Statistik</h2></div><div class="panel"><p class="muted">Noch keine Premier-League-Saison vorhanden.</p></div>`;
  return `<div class="section"><h2>🏆 Premier-League-Statistik</h2><p class="muted">Lokale Ligen · inklusive Saisonarchiv</p></div>`+leagues.map(l=>{
-  const standings=leagueStandings(l);
+  const standings=leagueStandings(l).filter(x=>!player(x.pid)?.isDeleted);
   return `<div class="panel"><h3>${esc(l.title)} ${l.closed?'· Abgeschlossen':'· Aktiv'}</h3>${standingsTable(standings)}<div class="row">${btn('Zur Premier League',"go('league')",'secondary')}</div></div>`;
  }).join('');
 }
@@ -473,7 +479,7 @@ function stats(){
 }
 function rules(){const sections=[['Aufstellen','10 Becher in Pyramidenform (4–3–2–1), mittig und ca. 10 cm von der Tischkante.'],['Anspiel','Ein Team beginnt mit zwei Würfen. Bei Uneinigkeit: Schere, Stein, Papier.'],['Werfen','Pro Team zwei Bälle pro Runde. Der Ellenbogen bleibt hinter der Tischkante.'],['Abwehren','Nicht direkte Würfe dürfen abgewehrt werden; direkte Würfe nicht. Bälle im Becher dürfen nicht herausgeblasen werden.'],['Kombinationen','Zwei unterschiedliche Becher: beide weg und zwei neue Würfe. Derselbe Becher: Bombe, dieser und drei nächstgelegene Becher weg, danach zwei neue Würfe.'],['Trickshot','Kommt der Ball ohne Fremdeinwirkung über die Tischmitte zurück, gibt es einen Trickshot.'],['Death Cup','Treffer in einen bereits getroffenen, aber noch stehenden Becher beendet das Spiel sofort.'],['Eigentor & umfallende Becher','Eigentore und umgefallene Becher haben eigene Strafregeln.'],['Zusammenstellen','Einmal pro Spiel, zu Beginn eines regulären eigenen Wurfs – niemals während einer Kombination oder ihrer Zusatzwürfe. Bei 6 Bechern grosse Pyramide; 5 Full House (3 Varianten); 4 Vagina; 3 kleine Pyramide; 2 Paar (3 Varianten).'],['Trinken','Getroffene Becher werden ausgetrunken; die Originalregeln enthalten zusätzliche Zeit- und Strafbestimmungen.']];return `<div class="section"><h2>📖 Rüfner Beer Pong Reglement</h2><p class="muted">Kurzübersicht. Das vollständige Originaldokument liegt der App bei.</p></div>${sections.map(([h,p])=>`<details><summary>${h}</summary><p>${p}</p></details>`).join('')}<div class="panel"><a class="btn" style="display:inline-block;text-decoration:none" href="reglement.pdf" target="_blank" rel="noopener">📄 Vollständiges Reglement (PDF)</a></div>`}
 render();
-if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('./sw.js?v=28').catch(()=>{});
+if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('./sw.js?v=29').catch(()=>{});
 
 // V2.8: Authentifizierte Rolle steuert die Online-Navigation, nicht das lokale Host-Profil.
 (async function syncOnlineNavigation(){
