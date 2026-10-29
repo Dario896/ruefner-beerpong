@@ -32,9 +32,9 @@ function reigningChampion(){const finished=db.leagues.filter(l=>l.closed&&champi
 function go(v){view=v;ui={};render()}
 function btn(text,fn,cls=''){return `<button class="btn ${cls}" onclick="${fn}">${text}</button>`}
 function header(){return `<div class="top"><div class="brand" onclick="go('home')" style="cursor:pointer">🏓 Rüfner <span>Beer Pong</span></div><div class="row">${db.current?`<span class="pill">${esc(name(db.current))}${reigningChampion()===db.current?' 👑':''}</span>`:''}<a class="btn secondary" style="text-decoration:none" href="online.html">🔐 Online</a>${btn('☰ Menü',"go('home')",'secondary')}</div></div>`}
-function render(){const root=document.getElementById('app');let body='';try{body=({home,profiles,training,friendship,league,stats,rules,game,history,firstThrow})[view]?.()||home()}catch(e){body=`<div class="notice">Fehler: ${esc(e.message)}</div>${btn('Zurück',"go('home')")}`};root.innerHTML=`<div class="shell">${header()}${body}<footer>Rüfner Beer Pong · V2.5 · Spielstände auf diesem Gerät lokal gespeichert</footer></div>`}
+function render(){const root=document.getElementById('app');let body='';try{body=({home,profiles,training,friendship,league,stats,rules,game,history,firstThrow})[view]?.()||home()}catch(e){body=`<div class="notice">Fehler: ${esc(e.message)}</div>${btn('Zurück',"go('home')")}`};root.innerHTML=`<div class="shell">${header()}${body}<footer>Rüfner Beer Pong · V2.6 · Freundschaftsspiele online · Training und Liga noch lokal</footer></div>`}
 function home(){return `<section class="hero"><div class="eyebrow">Die Liga beginnt hier</div><h1>Becher. Bomben. Ruhm. 🍻</h1><p>Training gegen Rüfner 3000, echte Duelle und Premier League.</p>${db.current?`<div class="row">${avatar(db.current)}<strong>Willkommen zurück, ${esc(name(db.current))}! 🍻</strong></div>`:`<div class="notice">Erstelle zuerst ein Spielerprofil und wähle es aus.</div>`}</section><div class="grid">${[['🤖','Training','Du gegen Rüfner 3000. Privat, ohne Statistik.','training'],['🏓','Freundschaftsspiel','Echte Duelle mit gemeinsamer Statistik.','friendship'],['🏆','Premier League','15 Nights und ein grosses Finale.','league'],['📊','Statistiken','Ranglisten, Bomben und direkte Duelle.','stats'],['👤','Profile','Spieler verwalten und Profilbild ändern.','profiles'],['📖','Regeln','Das Rüfner Beer Pong Reglement.','rules']].map(a=>`<button class="card action" onclick="go('${a[3]}')"><div class="emoji">${a[0]}</div><h3>${a[1]}</h3><p>${a[2]}</p></button>`).join('')}</div>`}
-function profiles(){return `<div class="section"><h2>👤 Spielerprofile</h2><p class="muted">Lokale Profile und geladene Online-Spieler. Spielstände bleiben vorerst auf diesem Gerät.</p></div><div class="panel"><h3>Neues Profil</h3><div class="field"><label>Spielername</label><input id="newName" maxlength="28" placeholder="Name"></div>${btn('Profil erstellen','createProfile()')}</div><div class="grid">${db.players.map(p=>`<div class="card"><div class="row">${avatar(p.id)}<strong>${esc(p.name)}${reigningChampion()===p.id?' 👑':''}</strong>${p.id===db.admin?'<span class="badge">Host</span>':''}</div><div class="row" style="margin-top:14px">${btn(p.id===db.current?'✓ Aktiv':'Profil auswählen',`selectProfile('${p.id}')`,p.id===db.current?'secondary':'')}${isAdmin()?btn('Name ändern',`renameProfile('${p.id}')`,'secondary'):''}</div>${p.id===db.current?`<div class="field"><label>Profilbild ändern</label><input type="file" accept="image/*" onchange="photoProfile(event,'${p.id}')"></div>`:''}</div>`).join('')}</div>`}
+function profiles(){return `<div class="section"><h2>👤 Spielerprofile</h2><p class="muted">Lokale Profile und geladene Online-Spieler. Freundschaftsspiele werden online gespeichert, Training und Liga bleiben lokal.</p></div><div class="panel"><h3>Neues Profil</h3><div class="field"><label>Spielername</label><input id="newName" maxlength="28" placeholder="Name"></div>${btn('Profil erstellen','createProfile()')}</div><div class="grid">${db.players.map(p=>`<div class="card"><div class="row">${avatar(p.id)}<strong>${esc(p.name)}${reigningChampion()===p.id?' 👑':''}</strong>${p.id===db.admin?'<span class="badge">Host</span>':''}</div><div class="row" style="margin-top:14px">${btn(p.id===db.current?'✓ Aktiv':'Profil auswählen',`selectProfile('${p.id}')`,p.id===db.current?'secondary':'')}${isAdmin()?btn('Name ändern',`renameProfile('${p.id}')`,'secondary'):''}</div>${p.id===db.current?`<div class="field"><label>Profilbild ändern</label><input type="file" accept="image/*" onchange="photoProfile(event,'${p.id}')"></div>`:''}</div>`).join('')}</div>`}
 function createProfile(){const el=document.getElementById('newName'),n=el.value.trim();if(n.length<2)return alert('Bitte mindestens 2 Zeichen eingeben.');if(db.players.some(p=>p.name.toLowerCase()===n.toLowerCase()))return alert('Name bereits vergeben.');const p={id:id(),name:n,photo:''};db.players.push(p);if(!db.admin)db.admin=p.id;db.current=p.id;save();render()}
 function selectProfile(i){db.current=i;save();render()}
 function renameProfile(i){if(!isAdmin())return;const n=prompt('Neuer Name:',name(i))?.trim();if(!n)return;if(db.players.some(p=>p.id!==i&&p.name.toLowerCase()===n.toLowerCase()))return alert('Name bereits vergeben.');player(i).name=n;save();render()}
@@ -81,15 +81,95 @@ async function loadOnlinePlayers(){
   onlineDirectoryError='Spielerliste konnte nicht geladen werden: '+(e.message||'Unbekannter Fehler');
  }finally{
   onlineDirectoryLoading=false;
-  if(view==='friendship'||view==='profiles')render();
+  if(view==='friendship'||view==='profiles'||view==='stats')render();
  }
 }
 function reloadOnlinePlayers(){onlineDirectoryLoaded=false;loadOnlinePlayers();}
 
+
+// V2.6: Freundschaftsspiele online speichern und gemeinsame Statistik laden.
+// Der öffentliche Supabase-Schlüssel kommt ausschliesslich aus online-config.js.
+let cloudClient=null,cloudResults=[],cloudResultsLoading=false,cloudResultsLoaded=false;
+let cloudResultsError='',cloudSaving=false;
+async function getCloudClient(){
+ if(cloudClient)return cloudClient;
+ const cfg=window.RUEFNER_SUPABASE;
+ if(!cfg?.url?.startsWith('https://')||!cfg?.publishableKey||cfg.publishableKey.includes('HIER_'))
+  throw Error('Online-Konfiguration fehlt.');
+ const {createClient}=await import('https://esm.sh/@supabase/supabase-js@2.49.4');
+ cloudClient=createClient(cfg.url,cfg.publishableKey,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false}});
+ return cloudClient;
+}
+async function cloudUser(){
+ const client=await getCloudClient();
+ const {data:{user},error}=await client.auth.getUser();
+ if(error||!user)throw Error('Bitte zuerst unter 🔐 Online anmelden.');
+ return {client,user};
+}
+function cloudId(localId){
+ const p=player(localId);
+ return p?.onlineId||null;
+}
+async function loadCloudResults(force=false){
+ if(cloudResultsLoading||cloudResultsLoaded&&!force)return;
+ cloudResultsLoading=true;cloudResultsError='';
+ if(view==='stats')render();
+ try{
+  const {client}=await cloudUser();
+  const {data,error}=await client.from('ruefner_match_results')
+   .select('client_match_id,player_a,player_b,winner,side_a,side_b,played_at')
+   .order('played_at',{ascending:false}).limit(1000);
+  if(error)throw error;
+  cloudResults=data||[];
+  cloudResultsLoaded=true;
+ }catch(e){cloudResultsError=e.message||'Online-Ergebnisse konnten nicht geladen werden.';}
+ finally{cloudResultsLoading=false;if(view==='stats')render();}
+}
+function refreshCloudResults(){cloudResultsLoaded=false;loadCloudResults(true);}
+function cloudStatsTable(){
+ if(!onlineDirectoryLoaded&&!onlineDirectoryLoading&&!onlineDirectoryError)setTimeout(loadOnlinePlayers,0);
+ if(!cloudResultsLoaded&&!cloudResultsLoading&&!cloudResultsError)setTimeout(loadCloudResults,0);
+ const status=cloudResultsLoading?'Online-Statistik wird geladen …':cloudResultsError||`${cloudResults.length} Online-Spiel(e) geladen.`;
+ const players=db.players.filter(p=>p.onlineId);
+ const rows=players.map(p=>{
+  const gs=cloudResults.filter(g=>g.player_a===p.onlineId||g.player_b===p.onlineId);
+  let wins=0,bombs=0,shots=0,hits=0,combos=0,diff=0;
+  for(const g of gs){
+   const isA=g.player_a===p.onlineId,s=isA?g.side_a:g.side_b,opp=isA?g.side_b:g.side_a;
+   wins+=g.winner===p.onlineId?1:0;
+   bombs+=Number(s?.bombs)||0;shots+=Number(s?.shots)||0;
+   hits+=Number(s?.hits)||0;combos+=Number(s?.combos)||0;
+   diff+=(Number(opp?.remaining)||0)-(Number(s?.remaining)||0);
+  }
+  return {p,games:gs.length,wins,bombs,shots,hits,combos,diff};
+ }).sort((a,b)=>b.wins-a.wins||b.diff-a.diff);
+ return `<div class="section"><h2>🌐 Gemeinsame Freundschaftsstatistik</h2></div><div class="panel"><p class="muted">${esc(status)} ${btn('↻ Aktualisieren','refreshCloudResults()','secondary')}</p>${cloudResultsError?'<p class="muted">Für gemeinsame Ergebnisse musst du online angemeldet sein.</p>':''}<div class="table-wrap"><table class="table"><thead><tr><th>Spieler</th><th>Spiele</th><th>Siege</th><th>Quote</th><th>💣</th><th>Kombi</th><th>+/-</th></tr></thead><tbody>${rows.map(x=>`<tr><td>${esc(x.p.name)}</td><td>${x.games}</td><td>${x.wins}</td><td>${x.shots?(100*x.hits/x.shots).toFixed(1)+' %':'–'}</td><td>${x.bombs}</td><td>${x.combos}</td><td>${x.diff>0?'+':''}${x.diff}</td></tr>`).join('')}</tbody></table></div></div>`;
+}
+async function saveFriendlyOnline(g){
+ const a=cloudId(g.a),b=cloudId(g.b),winner=cloudId(g.winner);
+ if(!a||!b||!winner)throw Error('Beide Spieler müssen registrierte Online-Profile sein. Bitte Spielerauswahl aktualisieren.');
+ const {client,user}=await cloudUser();
+ if(user.id!==a&&user.id!==b)throw Error('Nur ein beteiligter Spieler darf das Ergebnis online speichern. Bitte mit Dario oder dem Gegner anmelden.');
+ const payload={
+  client_match_id:g.id,player_a:a,player_b:b,winner,recorded_by:user.id,
+  played_at:g.date,side_a:g.sides[0],side_b:g.sides[1]
+ };
+ const {error}=await client.from('ruefner_match_results').insert(payload);
+ if(error&&error.code!=='23505')throw error;
+ // A duplicate ID is not proof that this exact result was stored: verify it.
+ if(error?.code==='23505'){
+  const {data, error:readError}=await client.from('ruefner_match_results')
+   .select('player_a,player_b,winner').eq('client_match_id',g.id).single();
+  if(readError||data?.player_a!==a||data?.player_b!==b||data?.winner!==winner)
+   throw Error('Diese Spiel-ID existiert bereits mit anderen Daten. Bitte Administrator kontaktieren.');
+ }
+ cloudResultsLoaded=false;cloudResultsError='';
+}
+
 function friendship(){
  if(!onlineDirectoryLoaded&&!onlineDirectoryLoading&&!onlineDirectoryError)setTimeout(loadOnlinePlayers,0);
  const directoryMessage=onlineDirectoryLoading?'Online-Spieler werden geladen …':onlineDirectoryError||'Online-Spieler geladen.';
- return `<div class="section"><h2>🏓 Freundschaftsspiel</h2><p class="muted">Ein Handy genügt. Die Spiele zählen derzeit zur lokalen Freundschaftsstatistik.</p></div><div class="panel"><p class="muted">${esc(directoryMessage)} ${btn('↻ Spieler aktualisieren','reloadOnlinePlayers()','secondary')}</p>${pairPicker()}${btn('Spiel starten',"startFriendly()")}</div>`;
+ return `<div class="section"><h2>🏓 Freundschaftsspiel</h2><p class="muted">Ein Handy genügt. Freundschaftsspiele werden online gespeichert. Bitte vorher online anmelden.</p></div><div class="panel"><p class="muted">${esc(directoryMessage)} ${btn('↻ Spieler aktualisieren','reloadOnlinePlayers()','secondary')}</p>${pairPicker()}${btn('Spiel starten',"startFriendly()")}</div>`;
 }
 function pairPicker(ids){const ps=ids||db.players.filter((p,i,arr)=>arr.findIndex(q=>q.name.toLocaleLowerCase('de')===p.name.toLocaleLowerCase('de'))===i).map(p=>p.id);return `<div class="field"><label>Spieler 1</label><select id="p1">${ps.map(p=>`<option value="${p}">${esc(name(p))}</option>`).join('')}</select></div><div class="field"><label>Spieler 2</label><select id="p2">${ps.map((p,i)=>`<option value="${p}" ${i===1?'selected':''}>${esc(name(p))}</option>`).join('')}</select></div>`}
 function startTraining(){if(!requireProfile())return;startMatch(db.current,'COM','training',null,Number(document.getElementById('difficulty').value))}
@@ -150,7 +230,7 @@ function game(){
  const a=match.a,b=match.b,owner=match.turn;
  const notice=ui.ownGoal?`⚽ Eigentor von ${esc(name([match.a,match.b][match.turn]))}: Tippe einen eigenen Becher an.`:match.pending?'💣 Bombe! Wähle die markierten Becher.':match.finished?'🏆 Spiel beendet.':match.awaitingTrick?'🎩 Wähle einen Trickshot für Rüfner 3000.':match.bonusPhase?`🎩 Trickshot: ${esc(trickNames[match.bonusType])} · jetzt ausführen!${trickCount()?' · danach noch ein Trickshot':''}`:`🎯 ${esc(name([a,b][owner]))} ist dran · Wurf ${match.round.length+1} von 2${trickCount()?' · '+trickCount()+' Trickshot(s) vorgemerkt':''}`;
  const controls=`<div class="game-actions">${btn('↶','undoShot()','secondary action-icon')}${canRerack()?btn('🔄','showRerack()','secondary action-icon'):''}${!match.finished&&isHumanTurn()&&!match.pending&&!match.bonusPhase&&!match.awaitingTrick&&match.round.length<2?btn('🎩','requestTrick()','secondary action-icon'):''}${ui.ownGoal?btn('✕ Eigentor abbrechen','cancelOwnGoal()','secondary'):''}${!ui.ownGoal&&!match.finished&&match.kind!=='training'&&!match.pending?btn('💀','deathCup()','secondary action-icon')+btn('⚽','ownGoal()','secondary action-icon'):''}</div>`;
- return `<div class="game-screen"><div class="section row between game-title"><h2>${match.kind==='training'?'🤖 Training':match.kind==='league'?'🏆 Premier League':'🏓 Freundschaftsspiel'}</h2>${btn('Abbrechen','cancelMatch()','secondary')}</div><div class="notice match-notice">${notice}</div><div class="table-with-actions"><div class="matchstack"><div class="table-side-label">🔴 ${esc(name(b))} · ${match.sides[1].cups.length}</div>${cupBoard(1)}<div class="table-middle-line"></div>${cupBoard(0)}<div class="table-side-label">🔵 ${esc(name(a))} · ${match.sides[0].cups.length}</div>${controls}</div></div>${ui.rerack?rerackPanel():''}${ui.trickFlash&&Date.now()<ui.trickFlash.until?`<div class="trick-flash" role="status" aria-live="polite"><div class="trick-flash-inner"><div class="trick-flash-title">🎩 TRICKSHOT!</div><div class="trick-flash-task">${esc(ui.trickFlash.label)}</div></div></div>`:''}${match.awaitingTrick?`<div class="trick-choice-backdrop" role="dialog" aria-modal="true" aria-label="Trickshot für COM wählen"><div class="trick-choice-modal"><div class="trick-choice-title">🎩 RÜFNER 3000 TRICKSHOT!</div><p>Welchen Trickshot muss der COM machen?</p><div class="trick-choice-grid">${trickNames.map((t,i)=>`<button class="btn secondary" onclick="chooseComTrick(${i})">${esc(t)}</button>`).join('')}</div></div></div>`:''}${ui.deathCup&&!match.finished?`<div class="trick-choice-backdrop" role="dialog" aria-modal="true" aria-label="Death Cup Sieger wählen"><div class="trick-choice-modal"><div class="trick-choice-title">💀 DEATH CUP!</div><p>Wer ist der Sieger?</p><div class="trick-choice-grid">${btn('🔵 '+esc(name(match.a)),'chooseDeathCupWinner(0)')}${btn('🔴 '+esc(name(match.b)),'chooseDeathCupWinner(1)')}</div><p>${btn('Abbrechen','cancelDeathCup()','secondary')}</p></div></div>`:''}${match.finished?`<div class="panel finish-panel"><h2>🏆 ${esc(name(match.winner))} gewinnt!</h2><p class="muted">Vertippt? ↶ am Tisch macht den letzten Wurf rückgängig.</p>${btn('Ergebnis speichern','finishMatch()')}${btn('Nicht speichern','cancelMatch()','secondary')}</div>`:''}<div class="panel match-stats"><div class="row between"><span class="muted">${esc(name(a))}: ${match.sides[0].hits}/${match.sides[0].shots} Treffer · ${match.sides[0].bombs} Bomben</span><span class="muted">${esc(name(b))}: ${match.sides[1].hits}/${match.sides[1].shots} Treffer · ${match.sides[1].bombs} Bomben</span></div></div></div>`;
+ return `<div class="game-screen"><div class="section row between game-title"><h2>${match.kind==='training'?'🤖 Training':match.kind==='league'?'🏆 Premier League':'🏓 Freundschaftsspiel'}</h2>${btn('Abbrechen','cancelMatch()','secondary')}</div><div class="notice match-notice">${notice}</div><div class="table-with-actions"><div class="matchstack"><div class="table-side-label">🔴 ${esc(name(b))} · ${match.sides[1].cups.length}</div>${cupBoard(1)}<div class="table-middle-line"></div>${cupBoard(0)}<div class="table-side-label">🔵 ${esc(name(a))} · ${match.sides[0].cups.length}</div>${controls}</div></div>${ui.rerack?rerackPanel():''}${ui.trickFlash&&Date.now()<ui.trickFlash.until?`<div class="trick-flash" role="status" aria-live="polite"><div class="trick-flash-inner"><div class="trick-flash-title">🎩 TRICKSHOT!</div><div class="trick-flash-task">${esc(ui.trickFlash.label)}</div></div></div>`:''}${match.awaitingTrick?`<div class="trick-choice-backdrop" role="dialog" aria-modal="true" aria-label="Trickshot für COM wählen"><div class="trick-choice-modal"><div class="trick-choice-title">🎩 RÜFNER 3000 TRICKSHOT!</div><p>Welchen Trickshot muss der COM machen?</p><div class="trick-choice-grid">${trickNames.map((t,i)=>`<button class="btn secondary" onclick="chooseComTrick(${i})">${esc(t)}</button>`).join('')}</div></div></div>`:''}${ui.deathCup&&!match.finished?`<div class="trick-choice-backdrop" role="dialog" aria-modal="true" aria-label="Death Cup Sieger wählen"><div class="trick-choice-modal"><div class="trick-choice-title">💀 DEATH CUP!</div><p>Wer ist der Sieger?</p><div class="trick-choice-grid">${btn('🔵 '+esc(name(match.a)),'chooseDeathCupWinner(0)')}${btn('🔴 '+esc(name(match.b)),'chooseDeathCupWinner(1)')}</div><p>${btn('Abbrechen','cancelDeathCup()','secondary')}</p></div></div>`:''}${match.finished?`<div class="panel finish-panel"><h2>🏆 ${esc(name(match.winner))} gewinnt!</h2><p class="muted">Vertippt? ↶ am Tisch macht den letzten Wurf rückgängig.</p>${btn(cloudSaving?'Speichert online …':'Ergebnis speichern','finishMatch()',cloudSaving?'secondary':'')}${btn('Nicht speichern','cancelMatch()','secondary')}</div>`:''}<div class="panel match-stats"><div class="row between"><span class="muted">${esc(name(a))}: ${match.sides[0].hits}/${match.sides[0].shots} Treffer · ${match.sides[0].bombs} Bomben</span><span class="muted">${esc(name(b))}: ${match.sides[1].hits}/${match.sides[1].shots} Treffer · ${match.sides[1].bombs} Bomben</span></div></div></div>`;
 }
 function snapshot(){match.undo.push(JSON.stringify({...match,undo:[]}));if(match.undo.length>30)match.undo.shift()}
 function undoShot(){if(!match?.undo.length)return;const old=match.undo.pop(),remaining=match.undo;match=JSON.parse(old);match.undo=remaining;ui.rerack=false;render()}
@@ -286,7 +366,29 @@ function chooseDeathCupWinner(side){
 function ownGoal(){if(!match||match.kind==='training'||match.finished||match.pending)return;ui.ownGoal=true;ui.rerack=false;render()}
 function cancelOwnGoal(){ui.ownGoal=false;render()}
 function cancelMatch(){if(!confirm('Spiel wirklich verlassen? Nicht gespeicherte Daten gehen verloren.'))return;match=null;go('home')}
-function finishMatch(){if(!match?.finished)return;const g={id:match.id,date:new Date().toISOString(),a:match.a,b:match.b,winner:match.winner,kind:match.kind,ref:match.ref,sides:match.sides.map(s=>({remaining:s.cups.length,shots:s.shots,hits:s.hits,bombs:s.bombs,combos:s.combos}))};if(match.kind==='training'){if(match.winner===match.a)db.record[match.a]=Math.max(db.record[match.a]??-1,match.difficulty)}else{db.games.push(g);if(match.kind==='league'){const l=db.leagues.find(l=>l.id===match.ref.league);if(l){l.games.push(g.id);if(match.ref.stage==='final16'&&l.games.filter(i=>db.games.find(g=>g.id===i)?.ref?.stage==='final16').length===2)l.closed=true}}}save();match=null;go(g.kind==='league'?'league':'stats')}
+async function finishMatch(){
+ if(!match?.finished||cloudSaving)return;
+ const g={id:match.id,date:new Date().toISOString(),a:match.a,b:match.b,winner:match.winner,kind:match.kind,ref:match.ref,sides:match.sides.map(s=>({remaining:s.cups.length,shots:s.shots,hits:s.hits,bombs:s.bombs,combos:s.combos}))};
+ if(g.kind==='friendly'){
+  cloudSaving=true;render();
+  try{await saveFriendlyOnline(g);}
+  catch(e){cloudSaving=false;render();alert('Online-Speichern fehlgeschlagen: '+(e.message||'Unbekannter Fehler')+'\nDas Spiel ist noch offen. Bitte erneut versuchen.');return;}
+  cloudSaving=false;
+ }
+ if(g.kind==='training'){
+  if(match.winner===match.a)db.record[match.a]=Math.max(db.record[match.a]??-1,match.difficulty);
+ }else{
+  if(!db.games.some(x=>x.id===g.id))db.games.push(g);
+  if(g.kind==='league'){
+   const l=db.leagues.find(l=>l.id===match.ref.league);
+   if(l){
+    if(!l.games.includes(g.id))l.games.push(g.id);
+    if(match.ref.stage==='final16'&&l.games.filter(i=>db.games.find(g=>g.id===i)?.ref?.stage==='final16').length===2)l.closed=true;
+   }
+  }
+ }
+ save();match=null;go(g.kind==='league'?'league':'stats');
+}
 function league(){const l=activeLeague();return `<div class="section row between"><h2>🏆 Premier League</h2>${isAdmin()?btn('Neue Saison','createLeagueForm()','secondary'):''}</div>${!l?`<div class="panel"><h3>Keine aktive Saison</h3><p class="muted">15 reguläre Nights, danach das grosse Finale.</p>${isAdmin()?btn('Saison erstellen','createLeagueForm()'):''}</div>`:leagueDetail(l)}<div class="section"><h2>📚 Saisonarchiv</h2></div>${db.leagues.filter(x=>x.closed).map(x=>`<div class="panel"><div class="row between"><strong>${esc(x.title)}</strong>${btn('Ansehen',`showArchived('${x.id}')`,'secondary')}</div></div>`).join('')||'<p class="muted">Noch keine abgeschlossenen Saisons.</p>'}`}
 function createLeagueForm(){if(!isAdmin())return alert('Nur der Host darf eine Saison erstellen.');if(activeLeague())return alert('Zuerst die aktive Saison abschliessen.');ui.create=true;renderLeagueForm()}
 function renderLeagueForm(){const ps=db.players.filter(p=>p.id!==db.current);document.getElementById('app').innerHTML=`<div class="shell">${header()}<div class="panel"><h2>🏆 Neue Premier League</h2><div class="field"><label>Saisonname</label><input id="seasonName" value="Premier League ${new Date().getFullYear()}"></div><p>Host: ${esc(name(db.current))}</p>${[1,2,3].map(i=>`<div class="field"><label>Mitspieler ${i}</label><select id="inv${i}">${ps.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('')}</select></div>`).join('')}${btn('Saison starten','createLeague()')} ${btn('Abbrechen',"go('league')",'secondary')}</div></div>`}
@@ -303,7 +405,7 @@ function finalNight(l){const rows=leagueStandings(l),gs=nightGames(l,16);return 
 function champion(l){return leagueGames(l).find(g=>g.ref?.stage==='final16')?.winner}
 function showArchived(i){const l=db.leagues.find(x=>x.id===i);if(!l)return;ui.archive=i;document.getElementById('app').innerHTML=`<div class="shell">${header()}${btn('← Zurück',"go('league')",'secondary')}${leagueDetail(l)}</div>`}
 function history(){return `<h2>Spiele</h2>${db.games.map(g=>`<div class="panel">${esc(name(g.a))} gegen ${esc(name(g.b))} · ${esc(name(g.winner))} gewinnt</div>`).join('')}`}
-function stats(){const friend=db.games.filter(g=>g.kind==='friendly'),rows=db.players.map(p=>{const gs=friend.filter(g=>g.a===p.id||g.b===p.id);let wins=0,bombs=0,shots=0,hits=0,combos=0,diff=0;for(const g of gs){const i=g.a===p.id?0:1,s=g.sides[i];wins+=g.winner===p.id?1:0;bombs+=s.bombs;shots+=s.shots;hits+=s.hits;combos+=s.combos;diff+=s.remaining-g.sides[1-i].remaining}return {p,games:gs.length,wins,bombs,shots,hits,combos,diff}}).sort((a,b)=>b.wins-a.wins||b.diff-a.diff);return `<div class="section"><h2>📊 Freundschaftsspiel-Statistik</h2></div><div class="panel table-wrap"><table class="table"><thead><tr><th>Spieler</th><th>Spiele</th><th>Siege</th><th>Quote</th><th>💣</th><th>Kombi</th><th>+/-</th></tr></thead><tbody>${rows.map(x=>`<tr><td>${esc(x.p.name)}</td><td>${x.games}</td><td>${x.wins}</td><td>${x.shots?(100*x.hits/x.shots).toFixed(1)+' %':'–'}</td><td>${x.bombs}</td><td>${x.combos}</td><td>${x.diff}</td></tr>`).join('')}</tbody></table></div><div class="section"><h2>🤖 Höchster besiegter Rüfner 3000</h2></div><div class="panel">${db.players.map(p=>`<p>${esc(p.name)}: <strong>${COM_NAMES[db.record[p.id]]||'Noch keiner'}</strong></p>`).join('')}</div><div class="section"><h2>🏆 Premier-League-Titel</h2></div><div class="panel">${db.players.map(p=>`<p>${esc(p.name)}: ${db.leagues.filter(l=>l.closed&&champion(l)===p.id).length} Meistertitel</p>`).join('')}</div>`}
-function rules(){const sections=[['Aufstellen','10 Becher in Pyramidenform (4–3–2–1), mittig und ca. 10 cm von der Tischkante.'],['Anspiel','Ein Team beginnt mit zwei Würfen. Bei Uneinigkeit: Schere, Stein, Papier.'],['Werfen','Pro Team zwei Bälle pro Runde. Der Ellenbogen bleibt hinter der Tischkante.'],['Abwehren','Nicht direkte Würfe dürfen abgewehrt werden; direkte Würfe nicht. Bälle im Becher dürfen nicht herausgeblasen werden.'],['Kombinationen','Zwei unterschiedliche Becher: beide weg und zwei neue Würfe. Derselbe Becher: Bombe, dieser und drei nächstgelegene Becher weg, danach zwei neue Würfe.'],['On Fire (Doppel)','Drei Treffer hintereinander: weiterschiessen bis zum Fehlwurf. Im Einzeltraining nicht separat aktiv.'],['Trickshot','Kommt der Ball ohne Fremdeinwirkung über die Tischmitte zurück, gibt es einen Trickshot.'],['Death Cup','Treffer in einen bereits getroffenen, aber noch stehenden Becher beendet das Spiel sofort.'],['Eigentor & umfallende Becher','Eigentore und umgefallene Becher haben eigene Strafregeln.'],['Zusammenstellen','Einmal pro Spiel, zu Beginn eines regulären eigenen Wurfs – niemals während einer Kombination oder ihrer Zusatzwürfe. Bei 6 Bechern grosse Pyramide; 5 Full House (3 Varianten); 4 Vagina; 3 kleine Pyramide; 2 Paar (3 Varianten).'],['Trinken','Getroffene Becher werden ausgetrunken; die Originalregeln enthalten zusätzliche Zeit- und Strafbestimmungen.']];return `<div class="section"><h2>📖 Rüfner Beer Pong Reglement</h2><p class="muted">Kurzübersicht. Das vollständige Originaldokument liegt der App bei.</p></div>${sections.map(([h,p])=>`<details><summary>${h}</summary><p>${p}</p></details>`).join('')}<div class="panel"><a class="btn" style="display:inline-block;text-decoration:none" href="reglement.pdf" target="_blank" rel="noopener">📄 Vollständiges Reglement (PDF)</a></div>`}
+function stats(){const friend=db.games.filter(g=>g.kind==='friendly'),rows=db.players.map(p=>{const gs=friend.filter(g=>g.a===p.id||g.b===p.id);let wins=0,bombs=0,shots=0,hits=0,combos=0,diff=0;for(const g of gs){const i=g.a===p.id?0:1,s=g.sides[i];wins+=g.winner===p.id?1:0;bombs+=s.bombs;shots+=s.shots;hits+=s.hits;combos+=s.combos;diff+=s.remaining-g.sides[1-i].remaining}return {p,games:gs.length,wins,bombs,shots,hits,combos,diff}}).sort((a,b)=>b.wins-a.wins||b.diff-a.diff);return `${cloudStatsTable()}<div class="section"><h2>📱 Lokale Freundschaftsstatistik (nur dieses Gerät)</h2></div><div class="panel table-wrap"><table class="table"><thead><tr><th>Spieler</th><th>Spiele</th><th>Siege</th><th>Quote</th><th>💣</th><th>Kombi</th><th>+/-</th></tr></thead><tbody>${rows.map(x=>`<tr><td>${esc(x.p.name)}</td><td>${x.games}</td><td>${x.wins}</td><td>${x.shots?(100*x.hits/x.shots).toFixed(1)+' %':'–'}</td><td>${x.bombs}</td><td>${x.combos}</td><td>${x.diff}</td></tr>`).join('')}</tbody></table></div><div class="section"><h2>🤖 Höchster besiegter Rüfner 3000</h2></div><div class="panel">${db.players.map(p=>`<p>${esc(p.name)}: <strong>${COM_NAMES[db.record[p.id]]||'Noch keiner'}</strong></p>`).join('')}</div><div class="section"><h2>🏆 Premier-League-Titel</h2></div><div class="panel">${db.players.map(p=>`<p>${esc(p.name)}: ${db.leagues.filter(l=>l.closed&&champion(l)===p.id).length} Meistertitel</p>`).join('')}</div>`}
+function rules(){const sections=[['Aufstellen','10 Becher in Pyramidenform (4–3–2–1), mittig und ca. 10 cm von der Tischkante.'],['Anspiel','Ein Team beginnt mit zwei Würfen. Bei Uneinigkeit: Schere, Stein, Papier.'],['Werfen','Pro Team zwei Bälle pro Runde. Der Ellenbogen bleibt hinter der Tischkante.'],['Abwehren','Nicht direkte Würfe dürfen abgewehrt werden; direkte Würfe nicht. Bälle im Becher dürfen nicht herausgeblasen werden.'],['Kombinationen','Zwei unterschiedliche Becher: beide weg und zwei neue Würfe. Derselbe Becher: Bombe, dieser und drei nächstgelegene Becher weg, danach zwei neue Würfe.'],['Trickshot','Kommt der Ball ohne Fremdeinwirkung über die Tischmitte zurück, gibt es einen Trickshot.'],['Death Cup','Treffer in einen bereits getroffenen, aber noch stehenden Becher beendet das Spiel sofort.'],['Eigentor & umfallende Becher','Eigentore und umgefallene Becher haben eigene Strafregeln.'],['Zusammenstellen','Einmal pro Spiel, zu Beginn eines regulären eigenen Wurfs – niemals während einer Kombination oder ihrer Zusatzwürfe. Bei 6 Bechern grosse Pyramide; 5 Full House (3 Varianten); 4 Vagina; 3 kleine Pyramide; 2 Paar (3 Varianten).'],['Trinken','Getroffene Becher werden ausgetrunken; die Originalregeln enthalten zusätzliche Zeit- und Strafbestimmungen.']];return `<div class="section"><h2>📖 Rüfner Beer Pong Reglement</h2><p class="muted">Kurzübersicht. Das vollständige Originaldokument liegt der App bei.</p></div>${sections.map(([h,p])=>`<details><summary>${h}</summary><p>${p}</p></details>`).join('')}<div class="panel"><a class="btn" style="display:inline-block;text-decoration:none" href="reglement.pdf" target="_blank" rel="noopener">📄 Vollständiges Reglement (PDF)</a></div>`}
 render();
-if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('./sw.js').catch(()=>{});
+if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('./sw.js?v=26').catch(()=>{});
