@@ -32,7 +32,7 @@ function reigningChampion(){const finished=db.leagues.filter(l=>l.closed&&champi
 function go(v){view=v;ui={};render()}
 function btn(text,fn,cls=''){return `<button class="btn ${cls}" onclick="${fn}">${text}</button>`}
 function header(){return `<div class="top"><div class="brand" onclick="go('home')" style="cursor:pointer">🏓 Rüfner <span>Beer Pong</span></div><div class="row">${db.current?`<span class="pill">${esc(name(db.current))}${reigningChampion()===db.current?' 👑':''}</span>`:''}<a class="btn secondary" style="text-decoration:none" href="online.html">🔐 Online</a>${btn('☰ Menü',"go('home')",'secondary')}</div></div>`}
-function render(){const root=document.getElementById('app');let body='';try{body=({home,profiles,training,friendship,league,stats,rules,game,history,firstThrow})[view]?.()||home()}catch(e){body=`<div class="notice">Fehler: ${esc(e.message)}</div>${btn('Zurück',"go('home')")}`};root.innerHTML=`<div class="shell">${header()}${body}<footer>Rüfner Beer Pong · V2.4 · Spielstände auf diesem Gerät lokal gespeichert</footer></div>`}
+function render(){const root=document.getElementById('app');let body='';try{body=({home,profiles,training,friendship,league,stats,rules,game,history,firstThrow})[view]?.()||home()}catch(e){body=`<div class="notice">Fehler: ${esc(e.message)}</div>${btn('Zurück',"go('home')")}`};root.innerHTML=`<div class="shell">${header()}${body}<footer>Rüfner Beer Pong · V2.4.1 · Spielstände auf diesem Gerät lokal gespeichert</footer></div>`}
 function home(){return `<section class="hero"><div class="eyebrow">Die Liga beginnt hier</div><h1>Becher. Bomben. Ruhm. 🍻</h1><p>Training gegen Rüfner 3000, echte Duelle und Premier League.</p>${db.current?`<div class="row">${avatar(db.current)}<strong>Willkommen zurück, ${esc(name(db.current))}! 🍻</strong></div>`:`<div class="notice">Erstelle zuerst ein Spielerprofil und wähle es aus.</div>`}</section><div class="grid">${[['🤖','Training','Du gegen Rüfner 3000. Privat, ohne Statistik.','training'],['🏓','Freundschaftsspiel','Echte Duelle mit gemeinsamer Statistik.','friendship'],['🏆','Premier League','15 Nights und ein grosses Finale.','league'],['📊','Statistiken','Ranglisten, Bomben und direkte Duelle.','stats'],['👤','Profile','Spieler verwalten und Profilbild ändern.','profiles'],['📖','Regeln','Das Rüfner Beer Pong Reglement.','rules']].map(a=>`<button class="card action" onclick="go('${a[3]}')"><div class="emoji">${a[0]}</div><h3>${a[1]}</h3><p>${a[2]}</p></button>`).join('')}</div>`}
 function profiles(){return `<div class="section"><h2>👤 Spielerprofile</h2><p class="muted">Lokale Profile und geladene Online-Spieler. Spielstände bleiben vorerst auf diesem Gerät.</p></div><div class="panel"><h3>Neues Profil</h3><div class="field"><label>Spielername</label><input id="newName" maxlength="28" placeholder="Name"></div>${btn('Profil erstellen','createProfile()')}</div><div class="grid">${db.players.map(p=>`<div class="card"><div class="row">${avatar(p.id)}<strong>${esc(p.name)}${reigningChampion()===p.id?' 👑':''}</strong>${p.id===db.admin?'<span class="badge">Host</span>':''}</div><div class="row" style="margin-top:14px">${btn(p.id===db.current?'✓ Aktiv':'Profil auswählen',`selectProfile('${p.id}')`,p.id===db.current?'secondary':'')}${isAdmin()?btn('Name ändern',`renameProfile('${p.id}')`,'secondary'):''}</div>${p.id===db.current?`<div class="field"><label>Profilbild ändern</label><input type="file" accept="image/*" onchange="photoProfile(event,'${p.id}')"></div>`:''}</div>`).join('')}</div>`}
 function createProfile(){const el=document.getElementById('newName'),n=el.value.trim();if(n.length<2)return alert('Bitte mindestens 2 Zeichen eingeben.');if(db.players.some(p=>p.name.toLowerCase()===n.toLowerCase()))return alert('Name bereits vergeben.');const p={id:id(),name:n,photo:''};db.players.push(p);if(!db.admin)db.admin=p.id;db.current=p.id;save();render()}
@@ -173,7 +173,7 @@ function missShot(){
  if(match.round.length===2)resolveRound();else render();
 }
 function resolveRound(){const r=match.round,side=boardIndex(),own=match.sides[match.turn];if(r.length!==2)return;const hits=r.filter(q=>q.cup!==undefined);if(hits.length===2&&hits[0].cup===hits[1].cup){own.bombs++;const c=hits[0].cup,origin=match.sides[side].positions[c];removeCups(side,[c]);if(match.sides[side].cups.length<=3){removeCups(side,[...match.sides[side].cups]);afterBomb();return}const remaining=3;if(remaining){match.pending={side,origin,remaining,allowed:nearestCandidates(side,origin,remaining)};if(match.kind==='training'&&side===1){autoBomb();return}render();return}afterBomb();return}if(hits.length===2){own.combos++;match.comboActive=true;match.comboBonusThrows=2;ui.rerack=false;removeCups(side,hits.map(q=>q.cup));match.round=[];if(checkWin())return;render();if(isComTurn())setTimeout(computerTurn,300);return}if(hits.length)removeCups(side,[hits[0].cup]);afterNormalRound()}
-function afterBomb(){if(checkWin())return;match.round=[];match.bonus=false;render();if(isComTurn())setTimeout(computerTurn,350)}
+function afterBomb(){if(checkWin())return;match.round=[];match.bonus=false;match.comboActive=true;match.comboBonusThrows=2;ui.rerack=false;render();if(isComTurn())setTimeout(computerTurn,350)}
 function afterNormalRound(){
  if(checkWin())return;
  match.round=[];
@@ -196,7 +196,7 @@ function requestTrick(){
  if(!match||match.finished||match.pending||isComTurn()||match.bonusPhase||match.awaitingTrick||match.round.length>=2)return;
  snapshot();match.tricks=(match.tricks||0)+1;
  // Der zurückgekommene Ball ist ein Fehlwurf; der Zusatzwurf erfolgt erst nach beiden Normalwürfen.
- match.sides[match.turn].shots++;match.round.push({miss:true,returned:true});
+ match.sides[match.turn].shots++;if(match.comboBonusThrows>0)match.comboBonusThrows--;match.round.push({miss:true,returned:true});
  if(match.round.length===2)resolveRound();else render();
 }
 function chooseComTrick(i){if(!match?.awaitingTrick||i<0||i>=trickNames.length)return;snapshot();match.awaitingTrick=false;match.bonusType=i;match.bonusPhase=true;showTrickFlash(trickNames[i]);render();setTimeout(computerTurn,650)}
@@ -215,7 +215,7 @@ function computerTurn(){
  if(canComRerack()&&Math.random()<COM_RERACK[match.difficulty]){
   const n=match.sides[0].cups.length;applyRerack(0,Math.floor(Math.random()*(variantNames[n]?.length||1)),false);
  }
- const p=COM_HIT[match.difficulty];const s=match.sides[1];snapshot();s.shots++;
+ const p=COM_HIT[match.difficulty];const s=match.sides[1];snapshot();s.shots++;if(match.comboBonusThrows>0)match.comboBonusThrows--;
  if(Math.random()<.05){
   match.tricks=(match.tricks||0)+1;match.round.push({miss:true,returned:true});
  }else if(Math.random()<p&&match.sides[0].cups.length){
