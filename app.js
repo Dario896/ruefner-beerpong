@@ -32,7 +32,7 @@ function reigningChampion(){const finished=db.leagues.filter(l=>l.closed&&champi
 function go(v){view=v;ui={};render()}
 function btn(text,fn,cls=''){return `<button class="btn ${cls}" onclick="${fn}">${text}</button>`}
 function header(){return `<div class="top"><div class="brand" onclick="go('home')" style="cursor:pointer">🏓 Rüfner <span>Beer Pong</span></div><div class="row">${db.current?`<span class="pill">${esc(name(db.current))}${reigningChampion()===db.current?' 👑':''}</span>`:''}<a class="btn secondary" style="text-decoration:none" href="online.html">🔐 Online</a>${btn('☰ Menü',"go('home')",'secondary')}</div></div>`}
-function render(){const root=document.getElementById('app');let body='';try{body=({home,profiles,training,friendship,league,stats,rules,game,history,firstThrow})[view]?.()||home()}catch(e){body=`<div class="notice">Fehler: ${esc(e.message)}</div>${btn('Zurück',"go('home')")}`};root.innerHTML=`<div class="shell">${header()}${body}<footer>Rüfner Beer Pong · V2.4.1 · Spielstände auf diesem Gerät lokal gespeichert</footer></div>`}
+function render(){const root=document.getElementById('app');let body='';try{body=({home,profiles,training,friendship,league,stats,rules,game,history,firstThrow})[view]?.()||home()}catch(e){body=`<div class="notice">Fehler: ${esc(e.message)}</div>${btn('Zurück',"go('home')")}`};root.innerHTML=`<div class="shell">${header()}${body}<footer>Rüfner Beer Pong · V2.5 · Spielstände auf diesem Gerät lokal gespeichert</footer></div>`}
 function home(){return `<section class="hero"><div class="eyebrow">Die Liga beginnt hier</div><h1>Becher. Bomben. Ruhm. 🍻</h1><p>Training gegen Rüfner 3000, echte Duelle und Premier League.</p>${db.current?`<div class="row">${avatar(db.current)}<strong>Willkommen zurück, ${esc(name(db.current))}! 🍻</strong></div>`:`<div class="notice">Erstelle zuerst ein Spielerprofil und wähle es aus.</div>`}</section><div class="grid">${[['🤖','Training','Du gegen Rüfner 3000. Privat, ohne Statistik.','training'],['🏓','Freundschaftsspiel','Echte Duelle mit gemeinsamer Statistik.','friendship'],['🏆','Premier League','15 Nights und ein grosses Finale.','league'],['📊','Statistiken','Ranglisten, Bomben und direkte Duelle.','stats'],['👤','Profile','Spieler verwalten und Profilbild ändern.','profiles'],['📖','Regeln','Das Rüfner Beer Pong Reglement.','rules']].map(a=>`<button class="card action" onclick="go('${a[3]}')"><div class="emoji">${a[0]}</div><h3>${a[1]}</h3><p>${a[2]}</p></button>`).join('')}</div>`}
 function profiles(){return `<div class="section"><h2>👤 Spielerprofile</h2><p class="muted">Lokale Profile und geladene Online-Spieler. Spielstände bleiben vorerst auf diesem Gerät.</p></div><div class="panel"><h3>Neues Profil</h3><div class="field"><label>Spielername</label><input id="newName" maxlength="28" placeholder="Name"></div>${btn('Profil erstellen','createProfile()')}</div><div class="grid">${db.players.map(p=>`<div class="card"><div class="row">${avatar(p.id)}<strong>${esc(p.name)}${reigningChampion()===p.id?' 👑':''}</strong>${p.id===db.admin?'<span class="badge">Host</span>':''}</div><div class="row" style="margin-top:14px">${btn(p.id===db.current?'✓ Aktiv':'Profil auswählen',`selectProfile('${p.id}')`,p.id===db.current?'secondary':'')}${isAdmin()?btn('Name ändern',`renameProfile('${p.id}')`,'secondary'):''}</div>${p.id===db.current?`<div class="field"><label>Profilbild ändern</label><input type="file" accept="image/*" onchange="photoProfile(event,'${p.id}')"></div>`:''}</div>`).join('')}</div>`}
 function createProfile(){const el=document.getElementById('newName'),n=el.value.trim();if(n.length<2)return alert('Bitte mindestens 2 Zeichen eingeben.');if(db.players.some(p=>p.name.toLowerCase()===n.toLowerCase()))return alert('Name bereits vergeben.');const p={id:id(),name:n,photo:''};db.players.push(p);if(!db.admin)db.admin=p.id;db.current=p.id;save();render()}
@@ -143,20 +143,52 @@ function finishTrick(){
 function isComTurn(){return match.kind==='training'&&match.turn===1}
 function isHumanTurn(){return !isComTurn()}
 function boardIndex(){return 1-match.turn}
-function cupBoard(sideIndex){const s=match.sides[sideIndex],target=boardIndex(),pending=match.pending?.side===sideIndex,allowed=match.pending?.allowed||[];const active=match.pending?pending:!match.finished&&isHumanTurn()&&sideIndex===target&&!match.awaitingTrick;return `<div class="cupfield ${sideIndex===1?'upper-field':'lower-field'} ${sideIndex===target?'attack-board':'defence-board'}" onclick="boardMiss(event,${sideIndex})"><div class="cups ${sideIndex===1?'board-top':'board-bottom'}">${s.cups.map(c=>{const pos=s.positions[c]||{x:145,y:115};const canTap=active&&(!pending||allowed.includes(c));return `<button class="cup ${sideIndex===1?'red':'blue'} ${pending&&allowed.includes(c)?'candidate':''} ${match.round.some(q=>q.cup===c&&q.side===sideIndex)?'pending':''}" style="left:${pos.x/290*100}%;top:${pos.y/230*100}%" ${canTap?'':'disabled'} onclick="tapCup(${sideIndex},${c});event.stopPropagation()" aria-label="Becher ${c+1}">${c+1}</button>`}).join('')}</div></div>`}
-function boardMiss(e,side){if(e.target.closest('button')||side!==boardIndex()||match.pending||match.finished||!isHumanTurn()||match.awaitingTrick)return;missShot()}
+function cupBoard(sideIndex){const s=match.sides[sideIndex],target=boardIndex(),pending=match.pending?.side===sideIndex,allowed=match.pending?.allowed||[];const ownGoalActive=ui.ownGoal&&sideIndex===match.turn;const active=ui.ownGoal?ownGoalActive:(match.pending?pending:!match.finished&&isHumanTurn()&&sideIndex===target&&!match.awaitingTrick);return `<div class="cupfield ${sideIndex===1?'upper-field':'lower-field'} ${sideIndex===target?'attack-board':'defence-board'}" onclick="boardMiss(event,${sideIndex})"><div class="cups ${sideIndex===1?'board-top':'board-bottom'}">${s.cups.map(c=>{const pos=s.positions[c]||{x:145,y:115};const canTap=active&&(ui.ownGoal||!pending||allowed.includes(c));return `<button class="cup ${sideIndex===1?'red':'blue'} ${(pending&&allowed.includes(c))||(ui.ownGoal&&sideIndex===match.turn)?'candidate':''} ${match.round.some(q=>q.cup===c&&q.side===sideIndex)?'pending':''}" style="left:${pos.x/290*100}%;top:${pos.y/230*100}%" ${canTap?'':'disabled'} onclick="tapCup(${sideIndex},${c});event.stopPropagation()" aria-label="Becher ${c+1}">${c+1}</button>`}).join('')}</div></div>`}
+function boardMiss(e,side){if(ui.ownGoal)return;if(e.target.closest('button')||side!==boardIndex()||match.pending||match.finished||!isHumanTurn()||match.awaitingTrick)return;missShot()}
 function game(){
  if(!match)return `<div class="notice">Kein aktives Spiel.</div>`;
  const a=match.a,b=match.b,owner=match.turn;
- const notice=match.pending?'💣 Bombe! Wähle die markierten Becher.':match.finished?'🏆 Spiel beendet.':match.awaitingTrick?'🎩 Wähle einen Trickshot für Rüfner 3000.':match.bonusPhase?`🎩 Trickshot: ${esc(trickNames[match.bonusType])} · jetzt ausführen!${trickCount()?' · danach noch ein Trickshot':''}`:`🎯 ${esc(name([a,b][owner]))} ist dran · Wurf ${match.round.length+1} von 2${trickCount()?' · '+trickCount()+' Trickshot(s) vorgemerkt':''}`;
- const controls=`<div class="game-actions">${btn('↶','undoShot()','secondary action-icon')}${canRerack()?btn('🔄','showRerack()','secondary action-icon'):''}${!match.finished&&isHumanTurn()&&!match.pending&&!match.bonusPhase&&!match.awaitingTrick&&match.round.length<2?btn('🎩','requestTrick()','secondary action-icon'):''}${!match.finished&&match.kind!=='training'&&!match.pending?btn('💀','deathCup()','secondary action-icon')+btn('⚽','ownGoal()','secondary action-icon'):''}</div>`;
+ const notice=ui.ownGoal?`⚽ Eigentor von ${esc(name([match.a,match.b][match.turn]))}: Tippe einen eigenen Becher an.`:match.pending?'💣 Bombe! Wähle die markierten Becher.':match.finished?'🏆 Spiel beendet.':match.awaitingTrick?'🎩 Wähle einen Trickshot für Rüfner 3000.':match.bonusPhase?`🎩 Trickshot: ${esc(trickNames[match.bonusType])} · jetzt ausführen!${trickCount()?' · danach noch ein Trickshot':''}`:`🎯 ${esc(name([a,b][owner]))} ist dran · Wurf ${match.round.length+1} von 2${trickCount()?' · '+trickCount()+' Trickshot(s) vorgemerkt':''}`;
+ const controls=`<div class="game-actions">${btn('↶','undoShot()','secondary action-icon')}${canRerack()?btn('🔄','showRerack()','secondary action-icon'):''}${!match.finished&&isHumanTurn()&&!match.pending&&!match.bonusPhase&&!match.awaitingTrick&&match.round.length<2?btn('🎩','requestTrick()','secondary action-icon'):''}${ui.ownGoal?btn('✕ Eigentor abbrechen','cancelOwnGoal()','secondary'):''}${!ui.ownGoal&&!match.finished&&match.kind!=='training'&&!match.pending?btn('💀','deathCup()','secondary action-icon')+btn('⚽','ownGoal()','secondary action-icon'):''}</div>`;
  return `<div class="game-screen"><div class="section row between game-title"><h2>${match.kind==='training'?'🤖 Training':match.kind==='league'?'🏆 Premier League':'🏓 Freundschaftsspiel'}</h2>${btn('Abbrechen','cancelMatch()','secondary')}</div><div class="notice match-notice">${notice}</div><div class="table-with-actions"><div class="matchstack"><div class="table-side-label">🔴 ${esc(name(b))} · ${match.sides[1].cups.length}</div>${cupBoard(1)}<div class="table-middle-line"></div>${cupBoard(0)}<div class="table-side-label">🔵 ${esc(name(a))} · ${match.sides[0].cups.length}</div>${controls}</div></div>${ui.rerack?rerackPanel():''}${ui.trickFlash&&Date.now()<ui.trickFlash.until?`<div class="trick-flash" role="status" aria-live="polite"><div class="trick-flash-inner"><div class="trick-flash-title">🎩 TRICKSHOT!</div><div class="trick-flash-task">${esc(ui.trickFlash.label)}</div></div></div>`:''}${match.awaitingTrick?`<div class="trick-choice-backdrop" role="dialog" aria-modal="true" aria-label="Trickshot für COM wählen"><div class="trick-choice-modal"><div class="trick-choice-title">🎩 RÜFNER 3000 TRICKSHOT!</div><p>Welchen Trickshot muss der COM machen?</p><div class="trick-choice-grid">${trickNames.map((t,i)=>`<button class="btn secondary" onclick="chooseComTrick(${i})">${esc(t)}</button>`).join('')}</div></div></div>`:''}${ui.deathCup&&!match.finished?`<div class="trick-choice-backdrop" role="dialog" aria-modal="true" aria-label="Death Cup Sieger wählen"><div class="trick-choice-modal"><div class="trick-choice-title">💀 DEATH CUP!</div><p>Wer ist der Sieger?</p><div class="trick-choice-grid">${btn('🔵 '+esc(name(match.a)),'chooseDeathCupWinner(0)')}${btn('🔴 '+esc(name(match.b)),'chooseDeathCupWinner(1)')}</div><p>${btn('Abbrechen','cancelDeathCup()','secondary')}</p></div></div>`:''}${match.finished?`<div class="panel finish-panel"><h2>🏆 ${esc(name(match.winner))} gewinnt!</h2><p class="muted">Vertippt? ↶ am Tisch macht den letzten Wurf rückgängig.</p>${btn('Ergebnis speichern','finishMatch()')}${btn('Nicht speichern','cancelMatch()','secondary')}</div>`:''}<div class="panel match-stats"><div class="row between"><span class="muted">${esc(name(a))}: ${match.sides[0].hits}/${match.sides[0].shots} Treffer · ${match.sides[0].bombs} Bomben</span><span class="muted">${esc(name(b))}: ${match.sides[1].hits}/${match.sides[1].shots} Treffer · ${match.sides[1].bombs} Bomben</span></div></div></div>`;
 }
 function snapshot(){match.undo.push(JSON.stringify({...match,undo:[]}));if(match.undo.length>30)match.undo.shift()}
 function undoShot(){if(!match?.undo.length)return;const old=match.undo.pop(),remaining=match.undo;match=JSON.parse(old);match.undo=remaining;ui.rerack=false;render()}
 function removeCups(side,cups){const s=match.sides[side];s.cups=s.cups.filter(c=>!cups.includes(c))}
-function nearestCandidates(side,origin,remaining){const s=match.sides[side];if(!s.cups.length)return [];const dist=s.cups.map(c=>({c,d:(s.positions[c].x-origin.x)**2+(s.positions[c].y-origin.y)**2})).sort((a,b)=>a.d-b.d);const threshold=dist[Math.min(remaining-1,dist.length-1)].d;return dist.filter(o=>o.d<=threshold+1).map(o=>o.c)}
-function tapCup(side,c){if(!match||match.finished)return;if(match.pending){if(side!==match.pending.side||!match.pending.allowed.includes(c))return;snapshot();const p=match.pending;removeCups(side,[c]);p.remaining--;if(!p.remaining||!match.sides[side].cups.length){match.pending=null;afterBomb()}else{p.allowed=p.allowed.filter(x=>match.sides[side].cups.includes(x));if(!p.allowed.length){match.pending=null;afterBomb()}}render();return}if(side!==boardIndex()||isComTurn()||match.awaitingTrick)return;snapshot();recordHit(side,c)}
+// Equilateral triangular cup grid: avoid tiny pixel rounding differences (53 vs 46).
+function bombDistance(origin,pos){
+ const dx=(pos.x-origin.x)/53,dy=(pos.y-origin.y)/46;
+ return Math.round((4*dx*dx+3*dy*dy)*10000)/10000;
+}
+function settleBomb(){
+ const p=match.pending;if(!p)return;
+ const side=match.sides[p.side];
+ while(p.remaining>0&&side.cups.length){
+  const ordered=side.cups.map(c=>({c,d:bombDistance(p.origin,side.positions[c])})).sort((a,b)=>a.d-b.d);
+  const boundary=ordered[Math.min(p.remaining-1,ordered.length-1)].d;
+  const forced=ordered.filter(o=>o.d<boundary-0.0001).map(o=>o.c);
+  if(!forced.length){p.allowed=ordered.filter(o=>Math.abs(o.d-boundary)<0.0001).map(o=>o.c);break;}
+  removeCups(p.side,forced);p.remaining-=forced.length;
+ }
+ if(p.remaining<=0||!side.cups.length){match.pending=null;afterBomb();return;}
+ if(p.allowed.length===p.remaining){removeCups(p.side,p.allowed);match.pending=null;afterBomb();return;}
+}
+function tapCup(side,c){
+ if(!match||match.finished)return;
+ if(ui.ownGoal){
+  if(side!==match.turn||!match.sides[side].cups.includes(c))return;
+  snapshot();ui.ownGoal=false;removeCups(side,[c]);if(!checkWin())render();return;
+ }
+ if(match.pending){
+  if(side!==match.pending.side||!match.pending.allowed.includes(c))return;
+  snapshot();removeCups(side,[c]);match.pending.remaining--;
+  if(match.pending.remaining<=0||!match.sides[side].cups.length){match.pending=null;afterBomb();}
+  else settleBomb();
+  render();return;
+ }
+ if(side!==boardIndex()||isComTurn()||match.awaitingTrick)return;
+ snapshot();recordHit(side,c);
+}
 function recordHit(side,c){
  const own=match.sides[match.turn];own.shots++;own.hits++;
  if(match.bonusPhase){removeCups(side,[c]);finishTrick();return}
@@ -172,7 +204,7 @@ function missShot(){
  if(match.comboBonusThrows>0)match.comboBonusThrows--;match.round.push({miss:true});
  if(match.round.length===2)resolveRound();else render();
 }
-function resolveRound(){const r=match.round,side=boardIndex(),own=match.sides[match.turn];if(r.length!==2)return;const hits=r.filter(q=>q.cup!==undefined);if(hits.length===2&&hits[0].cup===hits[1].cup){own.bombs++;const c=hits[0].cup,origin=match.sides[side].positions[c];removeCups(side,[c]);if(match.sides[side].cups.length<=3){removeCups(side,[...match.sides[side].cups]);afterBomb();return}const remaining=3;if(remaining){match.pending={side,origin,remaining,allowed:nearestCandidates(side,origin,remaining)};if(match.kind==='training'&&side===1){autoBomb();return}render();return}afterBomb();return}if(hits.length===2){own.combos++;match.comboActive=true;match.comboBonusThrows=2;ui.rerack=false;removeCups(side,hits.map(q=>q.cup));match.round=[];if(checkWin())return;render();if(isComTurn())setTimeout(computerTurn,300);return}if(hits.length)removeCups(side,[hits[0].cup]);afterNormalRound()}
+function resolveRound(){const r=match.round,side=boardIndex(),own=match.sides[match.turn];if(r.length!==2)return;const hits=r.filter(q=>q.cup!==undefined);if(hits.length===2&&hits[0].cup===hits[1].cup){own.bombs++;const c=hits[0].cup,origin=match.sides[side].positions[c];removeCups(side,[c]);if(match.sides[side].cups.length<=3){removeCups(side,[...match.sides[side].cups]);afterBomb();return}const remaining=3;if(remaining){match.pending={side,origin,remaining,allowed:[]};settleBomb();if(match.pending&&match.kind==='training'&&side===1){autoBomb();return}render();return}afterBomb();return}if(hits.length===2){own.combos++;match.comboActive=true;match.comboBonusThrows=2;ui.rerack=false;removeCups(side,hits.map(q=>q.cup));match.round=[];if(checkWin())return;render();if(isComTurn())setTimeout(computerTurn,300);return}if(hits.length)removeCups(side,[hits[0].cup]);afterNormalRound()}
 function afterBomb(){if(checkWin())return;match.round=[];match.bonus=false;match.comboActive=true;match.comboBonusThrows=2;ui.rerack=false;render();if(isComTurn())setTimeout(computerTurn,350)}
 function afterNormalRound(){
  if(checkWin())return;
@@ -191,7 +223,16 @@ function endRound(){
  match.turn=1-match.turn;match.comboActive=false;match.comboBonusThrows=0;ui.rerack=false;render();
  if(isComTurn())setTimeout(computerTurn,500);
 }
-function autoBomb(){while(match.pending){const p=match.pending,c=p.allowed[Math.floor(Math.random()*p.allowed.length)];removeCups(p.side,[c]);p.remaining--;if(!p.remaining||!match.sides[p.side].cups.length){match.pending=null;afterBomb();break}p.allowed=p.allowed.filter(x=>match.sides[p.side].cups.includes(x))}render()}
+function autoBomb(){
+ while(match.pending){
+  const p=match.pending,c=p.allowed[Math.floor(Math.random()*p.allowed.length)];
+  if(c===undefined)break;
+  removeCups(p.side,[c]);p.remaining--;
+  if(p.remaining<=0||!match.sides[p.side].cups.length){match.pending=null;afterBomb();break;}
+  settleBomb();
+ }
+ render();
+}
 function requestTrick(){
  if(!match||match.finished||match.pending||isComTurn()||match.bonusPhase||match.awaitingTrick||match.round.length>=2)return;
  snapshot();match.tricks=(match.tricks||0)+1;
@@ -242,7 +283,8 @@ function chooseDeathCupWinner(side){
  snapshot();match.finished=true;match.winner=[match.a,match.b][side];match.round=[];match.pending=null;match.bonus=false;match.tricks=0;match.bonusPhase=false;match.awaitingTrick=false;match.comboActive=false;
  ui.deathCup=false;render();
 }
-function ownGoal(){if(!match||match.kind==='training'||match.finished||match.pending)return;const side=match.turn,s=match.sides[side];if(!s.cups.length)return;const choice=prompt(`Eigentor: Welcher eigene Becher von ${name([match.a,match.b][side])}? (${s.cups.map(c=>c+1).join(', ')})`);if(choice===null)return;const c=Number(choice)-1;if(!s.cups.includes(c))return alert('Ungültiger Becher.');snapshot();removeCups(side,[c]);checkWin();render()}
+function ownGoal(){if(!match||match.kind==='training'||match.finished||match.pending)return;ui.ownGoal=true;ui.rerack=false;render()}
+function cancelOwnGoal(){ui.ownGoal=false;render()}
 function cancelMatch(){if(!confirm('Spiel wirklich verlassen? Nicht gespeicherte Daten gehen verloren.'))return;match=null;go('home')}
 function finishMatch(){if(!match?.finished)return;const g={id:match.id,date:new Date().toISOString(),a:match.a,b:match.b,winner:match.winner,kind:match.kind,ref:match.ref,sides:match.sides.map(s=>({remaining:s.cups.length,shots:s.shots,hits:s.hits,bombs:s.bombs,combos:s.combos}))};if(match.kind==='training'){if(match.winner===match.a)db.record[match.a]=Math.max(db.record[match.a]??-1,match.difficulty)}else{db.games.push(g);if(match.kind==='league'){const l=db.leagues.find(l=>l.id===match.ref.league);if(l){l.games.push(g.id);if(match.ref.stage==='final16'&&l.games.filter(i=>db.games.find(g=>g.id===i)?.ref?.stage==='final16').length===2)l.closed=true}}}save();match=null;go(g.kind==='league'?'league':'stats')}
 function league(){const l=activeLeague();return `<div class="section row between"><h2>🏆 Premier League</h2>${isAdmin()?btn('Neue Saison','createLeagueForm()','secondary'):''}</div>${!l?`<div class="panel"><h3>Keine aktive Saison</h3><p class="muted">15 reguläre Nights, danach das grosse Finale.</p>${isAdmin()?btn('Saison erstellen','createLeagueForm()'):''}</div>`:leagueDetail(l)}<div class="section"><h2>📚 Saisonarchiv</h2></div>${db.leagues.filter(x=>x.closed).map(x=>`<div class="panel"><div class="row between"><strong>${esc(x.title)}</strong>${btn('Ansehen',`showArchived('${x.id}')`,'secondary')}</div></div>`).join('')||'<p class="muted">Noch keine abgeschlossenen Saisons.</p>'}`}
