@@ -32,17 +32,66 @@ function reigningChampion(){const finished=db.leagues.filter(l=>l.closed&&champi
 function go(v){view=v;ui={};render()}
 function btn(text,fn,cls=''){return `<button class="btn ${cls}" onclick="${fn}">${text}</button>`}
 function header(){return `<div class="top"><div class="brand" onclick="go('home')" style="cursor:pointer">🏓 Rüfner <span>Beer Pong</span></div><div class="row">${db.current?`<span class="pill">${esc(name(db.current))}${reigningChampion()===db.current?' 👑':''}</span>`:''}<a class="btn secondary" style="text-decoration:none" href="online.html">🔐 Online</a>${btn('☰ Menü',"go('home')",'secondary')}</div></div>`}
-function render(){const root=document.getElementById('app');let body='';try{body=({home,profiles,training,friendship,league,stats,rules,game,history,firstThrow})[view]?.()||home()}catch(e){body=`<div class="notice">Fehler: ${esc(e.message)}</div>${btn('Zurück',"go('home')")}`};root.innerHTML=`<div class="shell">${header()}${body}<footer>Rüfner Beer Pong · V2.1 · Spielstände auf diesem Gerät lokal gespeichert</footer></div>`}
+function render(){const root=document.getElementById('app');let body='';try{body=({home,profiles,training,friendship,league,stats,rules,game,history,firstThrow})[view]?.()||home()}catch(e){body=`<div class="notice">Fehler: ${esc(e.message)}</div>${btn('Zurück',"go('home')")}`};root.innerHTML=`<div class="shell">${header()}${body}<footer>Rüfner Beer Pong · V2.2 · Spielstände auf diesem Gerät lokal gespeichert</footer></div>`}
 function home(){return `<section class="hero"><div class="eyebrow">Die Liga beginnt hier</div><h1>Becher. Bomben. Ruhm. 🍻</h1><p>Training gegen COM, echte Duelle und Premier League.</p>${db.current?`<div class="row">${avatar(db.current)}<strong>Willkommen zurück, ${esc(name(db.current))}! 🍻</strong></div>`:`<div class="notice">Erstelle zuerst ein Spielerprofil und wähle es aus.</div>`}</section><div class="grid">${[['🤖','Training','Du gegen den COM. Privat, ohne Statistik.','training'],['🏓','Freundschaftsspiel','Echte Duelle mit gemeinsamer Statistik.','friendship'],['🏆','Premier League','15 Nights und ein grosses Finale.','league'],['📊','Statistiken','Ranglisten, Bomben und direkte Duelle.','stats'],['👤','Profile','Spieler verwalten und Profilbild ändern.','profiles'],['📖','Regeln','Das Rüfner Beer Pong Reglement.','rules']].map(a=>`<button class="card action" onclick="go('${a[3]}')"><div class="emoji">${a[0]}</div><h3>${a[1]}</h3><p>${a[2]}</p></button>`).join('')}</div>`}
-function profiles(){return `<div class="section"><h2>👤 Spielerprofile</h2><p class="muted">Auf diesem Gerät angelegte Profile. Später können wir sie online verbinden.</p></div><div class="panel"><h3>Neues Profil</h3><div class="field"><label>Spielername</label><input id="newName" maxlength="28" placeholder="Name"></div>${btn('Profil erstellen','createProfile()')}</div><div class="grid">${db.players.map(p=>`<div class="card"><div class="row">${avatar(p.id)}<strong>${esc(p.name)}${reigningChampion()===p.id?' 👑':''}</strong>${p.id===db.admin?'<span class="badge">Host</span>':''}</div><div class="row" style="margin-top:14px">${btn(p.id===db.current?'✓ Aktiv':'Profil auswählen',`selectProfile('${p.id}')`,p.id===db.current?'secondary':'')}${isAdmin()?btn('Name ändern',`renameProfile('${p.id}')`,'secondary'):''}</div>${p.id===db.current?`<div class="field"><label>Profilbild ändern</label><input type="file" accept="image/*" onchange="photoProfile(event,'${p.id}')"></div>`:''}</div>`).join('')}</div>`}
+function profiles(){return `<div class="section"><h2>👤 Spielerprofile</h2><p class="muted">Lokale Profile und geladene Online-Spieler. Spielstände bleiben vorerst auf diesem Gerät.</p></div><div class="panel"><h3>Neues Profil</h3><div class="field"><label>Spielername</label><input id="newName" maxlength="28" placeholder="Name"></div>${btn('Profil erstellen','createProfile()')}</div><div class="grid">${db.players.map(p=>`<div class="card"><div class="row">${avatar(p.id)}<strong>${esc(p.name)}${reigningChampion()===p.id?' 👑':''}</strong>${p.id===db.admin?'<span class="badge">Host</span>':''}</div><div class="row" style="margin-top:14px">${btn(p.id===db.current?'✓ Aktiv':'Profil auswählen',`selectProfile('${p.id}')`,p.id===db.current?'secondary':'')}${isAdmin()?btn('Name ändern',`renameProfile('${p.id}')`,'secondary'):''}</div>${p.id===db.current?`<div class="field"><label>Profilbild ändern</label><input type="file" accept="image/*" onchange="photoProfile(event,'${p.id}')"></div>`:''}</div>`).join('')}</div>`}
 function createProfile(){const el=document.getElementById('newName'),n=el.value.trim();if(n.length<2)return alert('Bitte mindestens 2 Zeichen eingeben.');if(db.players.some(p=>p.name.toLowerCase()===n.toLowerCase()))return alert('Name bereits vergeben.');const p={id:id(),name:n,photo:''};db.players.push(p);if(!db.admin)db.admin=p.id;db.current=p.id;save();render()}
 function selectProfile(i){db.current=i;save();render()}
 function renameProfile(i){if(!isAdmin())return;const n=prompt('Neuer Name:',name(i))?.trim();if(!n)return;if(db.players.some(p=>p.id!==i&&p.name.toLowerCase()===n.toLowerCase()))return alert('Name bereits vergeben.');player(i).name=n;save();render()}
 function photoProfile(e,i){const f=e.target.files?.[0];if(!f)return;if(f.size>4e6)return alert('Bitte ein Bild unter 4 MB wählen.');const r=new FileReader();r.onload=()=>{const img=new Image();img.onload=()=>{const c=document.createElement('canvas');c.width=c.height=180;const ctx=c.getContext('2d');const z=Math.min(img.width,img.height),sx=(img.width-z)/2,sy=(img.height-z)/2;ctx.drawImage(img,sx,sy,z,z,0,0,180,180);player(i).photo=c.toDataURL('image/jpeg',.7);save();render()};img.src=r.result};r.readAsDataURL(f)}
 function requireProfile(){if(!db.current){go('profiles');return false}return true}
 function training(){return `<div class="section"><h2>🤖 Training</h2><p class="muted">Privat. Nur dein höchster besiegter COM wird gespeichert.</p></div><div class="panel"><div class="field"><label>Schwierigkeit</label><select id="difficulty"><option value="0">Anfänger</option><option value="1">Amateur</option><option value="2">Fortgeschritten</option><option value="3">Profi</option><option value="4">Legende</option><option value="5">👹 Unbesiegbar</option></select></div>${btn('Training starten','startTraining()')}</div>`}
-function friendship(){return `<div class="section"><h2>🏓 Freundschaftsspiel</h2><p class="muted">Ein Handy genügt. Die Spiele zählen zur Freundschaftsstatistik.</p></div><div class="panel">${pairPicker()}${btn('Spiel starten',"startFriendly()")}</div>`}
-function pairPicker(ids){const ps=ids||db.players.map(p=>p.id);return `<div class="field"><label>Spieler 1</label><select id="p1">${ps.map(p=>`<option value="${p}">${esc(name(p))}</option>`).join('')}</select></div><div class="field"><label>Spieler 2</label><select id="p2">${ps.map((p,i)=>`<option value="${p}" ${i===1?'selected':''}>${esc(name(p))}</option>`).join('')}</select></div>`}
+
+// Online-Spielerverzeichnis (V2.2): Nur für angemeldete Benutzer.
+// Spielstände bleiben in dieser Zwischenversion weiterhin lokal.
+let onlineDirectoryLoading=false, onlineDirectoryLoaded=false, onlineDirectoryError='';
+async function loadOnlinePlayers(){
+ if(onlineDirectoryLoading)return;
+ const cfg=window.RUEFNER_SUPABASE;
+ if(!cfg?.url||!cfg?.publishableKey||cfg.publishableKey.includes('HIER_')){
+  onlineDirectoryError='Online-Konfiguration fehlt.';render();return;
+ }
+ onlineDirectoryLoading=true;onlineDirectoryError='';render();
+ try{
+  const {createClient}=await import('https://esm.sh/@supabase/supabase-js@2.49.4');
+  const client=createClient(cfg.url,cfg.publishableKey,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false}});
+  const {data:{user},error:authError}=await client.auth.getUser();
+  if(authError||!user){
+   onlineDirectoryError='Bitte zuerst unter 🔐 Online anmelden.';
+   return;
+  }
+  const {data:profiles,error}=await client.from('player_profiles')
+   .select('id,username,is_blocked').eq('is_blocked',false).order('username');
+  if(error)throw error;
+  if(!Array.isArray(profiles))throw Error('Keine Spielerliste erhalten.');
+  let changed=false;
+  for(const p of profiles){
+   if(!p.id||!p.username)continue;
+   const existing=db.players.find(x=>x.name.toLocaleLowerCase('de')===p.username.toLocaleLowerCase('de'));
+   if(existing){
+    if(existing.onlineId!==p.id){existing.onlineId=p.id;changed=true;}
+   }else{
+    db.players.push({id:'online-'+p.id,onlineId:p.id,name:p.username,photo:''});
+    changed=true;
+   }
+  }
+  if(changed)save();
+  onlineDirectoryLoaded=true;
+ }catch(e){
+  onlineDirectoryError='Spielerliste konnte nicht geladen werden: '+(e.message||'Unbekannter Fehler');
+ }finally{
+  onlineDirectoryLoading=false;
+  if(view==='friendship'||view==='profiles')render();
+ }
+}
+function reloadOnlinePlayers(){onlineDirectoryLoaded=false;loadOnlinePlayers();}
+
+function friendship(){
+ if(!onlineDirectoryLoaded&&!onlineDirectoryLoading&&!onlineDirectoryError)setTimeout(loadOnlinePlayers,0);
+ const directoryMessage=onlineDirectoryLoading?'Online-Spieler werden geladen …':onlineDirectoryError||'Online-Spieler geladen.';
+ return `<div class="section"><h2>🏓 Freundschaftsspiel</h2><p class="muted">Ein Handy genügt. Die Spiele zählen derzeit zur lokalen Freundschaftsstatistik.</p></div><div class="panel"><p class="muted">${esc(directoryMessage)} ${btn('↻ Spieler aktualisieren','reloadOnlinePlayers()','secondary')}</p>${pairPicker()}${btn('Spiel starten',"startFriendly()")}</div>`;
+}
+function pairPicker(ids){const ps=ids||db.players.filter((p,i,arr)=>arr.findIndex(q=>q.name.toLocaleLowerCase('de')===p.name.toLocaleLowerCase('de'))===i).map(p=>p.id);return `<div class="field"><label>Spieler 1</label><select id="p1">${ps.map(p=>`<option value="${p}">${esc(name(p))}</option>`).join('')}</select></div><div class="field"><label>Spieler 2</label><select id="p2">${ps.map((p,i)=>`<option value="${p}" ${i===1?'selected':''}>${esc(name(p))}</option>`).join('')}</select></div>`}
 function startTraining(){if(!requireProfile())return;startMatch(db.current,'COM','training',null,Number(document.getElementById('difficulty').value))}
 function startFriendly(){if(db.players.length<2)return alert('Erstelle zuerst mindestens zwei Profile.');const a=document.getElementById('p1').value,b=document.getElementById('p2').value;if(a===b)return alert('Bitte zwei unterschiedliche Spieler wählen.');startMatch(a,b,'friendly')}
 function newSide(){return {cups:Array.from({length:10},(_,i)=>i),layout:10,positions:formationCoords(10,0),reracked:false,shots:0,hits:0,bombs:0,combos:0}}
