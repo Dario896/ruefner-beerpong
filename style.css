@@ -75,33 +75,10 @@
 .trick-choice-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
 .trick-choice-grid .btn{white-space:normal;min-height:52px;padding:10px 7px}
 @media(max-width:380px){.trick-choice-modal{padding:12px}.trick-choice-grid{gap:6px}.trick-choice-grid .btn{font-size:13px;min-height:46px}}
-
-/* V3: additive full-screen carbon design; previous styles intentionally retained */
-.game-shell{max-width:760px;padding:10px 8px 22px;min-height:100dvh}
-.game-screen{max-width:740px;position:relative;margin:auto}
-.game-exit{position:absolute;right:4px;top:4px;z-index:12}
-.game-exit .btn{padding:5px 10px;font-size:17px;background:#273746dd}
-.matchstack{border:5px solid #222b3b;border-radius:24px;background:repeating-linear-gradient(135deg,#111b28 0,#111b28 3px,#182534 3px,#182534 6px);box-shadow:inset 0 0 0 2px #52667b,0 0 25px #112c49,0 16px 40px #0008;padding:12px 6px}
-.matchstack:before{content:'';position:absolute;inset:7px;pointer-events:none;border-radius:15px;border:1px solid #7c9eb533}
-.matchstack .cupfield{height:clamp(185px,30vh,255px)}
-.matchstack .cups{transform:scale(.94)}.matchstack .board-top{transform:scale(.94) rotate(180deg)}
-.matchstack .cup{width:52px;height:52px;border:3px solid #e5effa;border-radius:50%;font-size:12px;background:radial-gradient(circle at 32% 28%,#fff9,#fff0 40%),#d8dfe6;box-shadow:inset 0 0 0 7px #d34b59,inset 0 -8px 10px #0004,0 4px 9px #0008}
-.matchstack .cup.red{box-shadow:inset 0 0 0 7px #df3b5c,inset 0 -8px 10px #0005,0 0 10px #e73c5a55,0 5px 8px #0008}
-.matchstack .cup.blue{box-shadow:inset 0 0 0 7px #278bea,inset 0 -8px 10px #0005,0 0 10px #318aff55,0 5px 8px #0008}
-.matchstack .cup.candidate{box-shadow:0 0 0 5px #f9c44b99}
-.table-side-label{display:flex;justify-content:center;align-items:center;gap:8px;min-height:44px;font-size:15px;transition:filter .2s}
-.table-side-label .avatar{width:34px;height:34px;border:3px solid currentColor;background:#263747}
-.table-side-label.red-side{color:#ff657f}.table-side-label.blue-side{color:#61b6ff}
-.table-side-label span:not(.avatar){color:#f7f9fc}
-.table-side-label small{font-size:11px;color:#fff;background:#28384b;border-radius:8px;padding:4px 6px}
-.table-side-label.active-side{filter:drop-shadow(0 0 9px currentColor)}
-.table-middle-line{background:linear-gradient(90deg,transparent,#b1c7d877,transparent)}
-.game-actions{left:5px;gap:9px}.game-actions .action-icon{min-width:42px;min-height:42px;font-size:20px;background:#152436eb;border:1px solid #6b8ba8;color:#f8fbff;box-shadow:0 0 10px #3676a833}
-.trick-flash{pointer-events:auto;cursor:pointer;touch-action:manipulation}.trick-flash-hint{margin-top:12px;color:#fff9;font-size:13px}
-.finish-backdrop{position:fixed;inset:0;background:#07111dd9;display:grid;place-items:center;z-index:75;padding:18px}.finish-panel{width:min(440px,100%);text-align:center;box-shadow:0 0 45px #ffbb4477}
-.stat-player{display:inline-flex;align-items:center;gap:8px}.stat-player .avatar{width:30px;height:30px}
-.photo-button{display:inline-flex;margin-top:15px;align-items:center;cursor:pointer}.visually-hidden{position:absolute!important;width:1px!important;height:1px!important;opacity:0!important;overflow:hidden!important;clip:rect(0,0,0,0)!important}
-.profile-focus .avatar{width:64px;height:64px}
-@media(max-width:650px){.game-shell{padding:5px 4px 12px}.matchstack{border-width:4px;padding:8px 3px}.matchstack .cupfield{height:clamp(172px,28vh,225px)}.matchstack .cups{transform:scale(.83)}.matchstack .board-top{transform:scale(.83) rotate(180deg)}.matchstack .cup{width:53px;height:53px}.game-actions{left:3px;gap:7px}.game-actions .action-icon{min-width:37px;min-height:40px;font-size:18px}.table-side-label{min-height:41px}}
-@media(max-width:370px){.matchstack .cups{transform:scale(.72)}.matchstack .board-top{transform:scale(.72) rotate(180deg)}}
-@media(max-height:740px) and (max-width:650px){.matchstack .cupfield{height:clamp(155px,25vh,195px)}}
+/* V3.0 – kompakte Statistik auf dem Smartphone */
+.compact-stats{width:100%;table-layout:fixed}
+.compact-stats th:first-child,.compact-stats td:first-child{width:43%;text-align:left}
+.compact-stats th:not(:first-child),.compact-stats td:not(:first-child){text-align:center}
+.compact-stats td,.compact-stats th{padding:12px 6px}
+.compact-stats td .btn{max-width:100%;white-space:normal;overflow-wrap:anywhere;text-align:left;padding:10px 8px;font-size:clamp(11px,3vw,14px)}
+@media(max-width:440px){.compact-stats th,.compact-stats td{font-size:12px;padding:9px 3px}.compact-stats td .btn{font-size:12px}}
