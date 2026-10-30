@@ -82,3 +82,38 @@
 .compact-stats td,.compact-stats th{padding:12px 6px}
 .compact-stats td .btn{max-width:100%;white-space:normal;overflow-wrap:anywhere;text-align:left;padding:10px 8px;font-size:clamp(11px,3vw,14px)}
 @media(max-width:440px){.compact-stats th,.compact-stats td{font-size:12px;padding:9px 3px}.compact-stats td .btn{font-size:12px}}
+
+/* V3.1: kompakte Startseite, grosse gut erreichbare 3D-Becher */
+.welcome-mini{display:flex;align-items:center;gap:12px;margin:0 0 18px;padding:10px 2px;font-size:clamp(16px,4vw,20px)}
+.welcome-mini .avatar{width:38px;height:38px}
+/* Dunkler, breiter Spieltisch ohne Mittelspalt. */
+.game-screen{max-width:780px}
+.matchstack{max-width:740px;padding:7px 4px;border:5px solid #546a7b;border-radius:24px;background:repeating-linear-gradient(143deg,rgba(72,112,143,.12) 0 13px,transparent 13px 31px),linear-gradient(145deg,#152b43,#101d33 55%,#1a344a);box-shadow:inset 0 0 0 2px #a4b4c066,0 14px 34px #0009}
+.matchstack .cupfield{height:clamp(245px,34vh,300px);overflow:visible}
+.matchstack .cups{transform:scale(1.10)}
+.matchstack .board-top{transform:scale(1.10) rotate(180deg)}
+.matchstack .cup{width:53px;height:60px;border:0;border-radius:0;background:transparent!important;box-shadow:none!important;overflow:visible;isolation:isolate;touch-action:manipulation;filter:drop-shadow(0 6px 4px #0008)}
+.matchstack .cup::before{content:"";position:absolute;z-index:0;left:3px;right:3px;top:10px;bottom:2px;clip-path:polygon(0 0,100% 0,85% 100%,15% 100%);background:linear-gradient(90deg,#6f1529,#ed5665 26%,#d52243 64%,#79172b);border-radius:0 0 9px 9px}
+.matchstack .cup::after{content:"";position:absolute;z-index:1;left:1px;right:1px;top:3px;height:24px;border-radius:50%;border:5px solid #ffd5d7;background:radial-gradient(ellipse at 50% 53%,#631522 0 56%,#b92a3c 62%,#e65768 100%);box-shadow:0 2px 2px #0005}
+.matchstack .cup.blue::before{background:linear-gradient(90deg,#113b83,#4da7ff 27%,#1b71d9 64%,#0c3c87)}
+.matchstack .cup.blue::after{border-color:#d5ecff;background:radial-gradient(ellipse at 50% 53%,#103d7d 0 56%,#286fc6 62%,#6db5ff 100%)}
+.matchstack .cup.candidate{filter:drop-shadow(0 0 8px #ffd458) drop-shadow(0 5px 3px #0008)}
+.matchstack .cup.pending{filter:drop-shadow(0 0 9px #6af9f1)}
+.matchstack .cup.selected{filter:drop-shadow(0 0 9px #ffeb59)}
+.matchstack .cup:disabled{opacity:.94}
+.game-actions .undo-icon{font-size:30px;font-weight:900;min-height:52px;min-width:52px;border:2px solid #e8f2f6}
+.table-middle-line{background:transparent}
+@media(max-width:650px){
+ .shell:has(.game-screen){padding-left:5px;padding-right:5px}
+ .matchstack{border-width:4px;padding:4px 2px}
+ .matchstack .cupfield{height:clamp(218px,31vh,280px)}
+ .matchstack .cups{transform:scale(1)}
+ .matchstack .board-top{transform:scale(1) rotate(180deg)}
+ .matchstack .cup{width:53px;height:60px}
+ .game-actions{left:2px}
+ .game-actions .undo-icon{font-size:27px;min-width:43px;min-height:47px}
+ .compact-stats th,.compact-stats td{padding:8px 2px}
+ .compact-stats td .btn{font-size:11px;padding:8px 4px}
+}
+@media(max-width:355px){.matchstack .cups{transform:scale(.91)}.matchstack .board-top{transform:scale(.91) rotate(180deg)}}
+@media(max-height:720px) and (max-width:650px){.matchstack .cupfield{height:clamp(200px,29vh,240px)}}
