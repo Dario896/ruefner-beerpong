@@ -240,3 +240,13 @@
   overflow:visible!important;
   text-overflow:clip!important;
 }
+
+/* V4.0: Siegeranzeige mittig ueber dem Spielfeld, alle Aktionen direkt im Overlay. */
+.game-screen .victory-overlay{position:fixed;inset:0;z-index:120;display:flex;align-items:center;justify-content:center;padding:18px;background:rgba(4,13,26,.72);backdrop-filter:blur(3px);}
+.game-screen .victory-card{width:min(440px,100%);padding:28px 20px;text-align:center;border:2px solid #ffcf69;border-radius:22px;background:linear-gradient(155deg,#203c55,#102236);box-shadow:0 0 24px #ffc45c77,0 16px 50px #000a;animation:victoryAppear .28s ease-out both;}
+.game-screen .victory-trophy{font-size:56px;line-height:1.2;filter:drop-shadow(0 0 12px #ffcf70);}
+.game-screen .victory-card h2{margin:12px 0;color:#ffe39a;font-size:clamp(25px,7vw,37px);text-shadow:0 0 12px #ffc45b,0 0 28px #ffc45b77;overflow-wrap:anywhere;}
+.game-screen .victory-card p{color:#c8d9e6;font-size:14px;}
+.game-screen .victory-buttons{display:flex;flex-direction:column;gap:10px;margin-top:20px;}
+.game-screen .victory-buttons .btn{width:100%;min-height:48px;}
+@keyframes victoryAppear{from{opacity:0;transform:scale(.9)}to{opacity:1;transform:scale(1)}}
