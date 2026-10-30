@@ -13,9 +13,9 @@ else {
    if(error&&!String(error.message).includes('Auth session missing'))throw error;
    currentUser=user||null;$('admin-panel').hidden=true;$('registration-panel').hidden=!!user;$('login-form').hidden=!!user;$('register-form').hidden=!!user;$('account').hidden=!user;
    if(!user){status('');return;}
-   const {data:profile,error:pe}=await client.from('player_profiles').select('username,is_admin,is_blocked,is_deleted').eq('id',user.id).single();
+   const {data:profile,error:pe}=await client.from('player_profiles').select('username,is_admin,is_blocked').eq('id',user.id).single();
    if(pe||!profile){status('Angemeldet, aber Profil nicht lesbar. Bitte Administrator kontaktieren.');$('account-name').textContent='Anmeldung aktiv.';return;}
-   if(profile.is_blocked||profile.is_deleted){await client.auth.signOut();status('Dieses Konto ist gesperrt.');return;}
+   if(profile.is_blocked){await client.auth.signOut();status('Dieses Konto ist gesperrt.');return;}
    $('account-name').textContent=`${profile.username} · ${profile.is_admin?'👑 Administrator':'Spieler'}`;
    if(user.user_metadata?.ruefner_password_change_required){
     const next=prompt('Dein Passwort wurde zurückgesetzt. Bitte jetzt ein eigenes neues Passwort wählen (mindestens 12 Zeichen):');
@@ -52,7 +52,7 @@ else {
   finally{$('reg-password').value='';button.disabled=false;}
  });
 
- let adminPlayers=[],activePlayers=[],adminGames=[],visibleGames=5,searchTerm='';
+ let adminPlayers=[],adminGames=[],visibleGames=5,searchTerm='';
  async function adminAction(action,payload={}){
   const {data:{session}}=await client.auth.getSession();
   if(!session?.access_token)throw Error('Bitte erneut anmelden.');
@@ -75,7 +75,7 @@ else {
  const label=id=>adminPlayers.find(p=>p.id===id)?.username||'Unbekannt';
  function showPlayers(){
   const root=$('admin-players');root.replaceChildren();
-  for(const p of activePlayers){
+  for(const p of adminPlayers){
    const box=el('div',undefined,'notice');
    const title=el('strong',p.username+(p.is_admin?' 👑':'')+(p.is_blocked?' · Gesperrt':''));box.append(title);
    if(!p.is_admin){
@@ -99,17 +99,7 @@ else {
      try{await adminAction('set-blocked',{playerId:p.id,blocked:!p.is_blocked});await loadAdmin()}
      catch(e){alert(e.message)}
     }));
-     actions.append(button('🗑️ Spieler endgültig löschen',async()=>{
-      if(!confirm('Konto von '+p.username+' endgültig löschen? Alte Spiele und Rekorde bleiben erhalten.'))return;
-      const typed=prompt('Zur Bestätigung den Spielernamen exakt eingeben: '+p.username);
-      if(typed!==p.username)return alert('Abgebrochen: Name stimmt nicht überein.');
-      try{
-       const result=await adminAction('delete-player',{playerId:p.id});
-       alert(result.message||'Konto gelöscht. Historische Spiele bleiben erhalten.');
-       await loadAdmin();
-      }catch(e){alert('Spieler konnte nicht gelöscht werden: '+e.message)}
-     }));
-     box.append(actions);
+    box.append(actions);
    }
    root.append(box);
   }
@@ -119,7 +109,7 @@ else {
   let search=document.getElementById('game-search');
   if(!search){
    search=el('input');search.id='game-search';search.placeholder='🔎 Spieler oder Datum suchen';
-   search.style.display='block';search.style.marginBottom='12px';search.style.width='100%';search.style.maxWidth='none';search.style.minWidth='0';search.style.boxSizing='border-box';
+   search.style.marginBottom='12px';
    search.addEventListener('input',()=>{searchTerm=search.value;visibleGames=5;showGames()});
   }
   search.value=searchTerm;root.append(search);
@@ -162,6 +152,7 @@ else {
  function showInvites(invites){
   const root=$('admin-invites');root.replaceChildren();
   for(const inv of invites){
+   if(inv.used_at)continue;
    const state=inv.revoked_at?'Deaktiviert':inv.used_at?'Verwendet':'Offen';
    const box=el('div',undefined,'notice');box.append(el('span',new Date(inv.created_at).toLocaleDateString('de-CH')+' · '+state));
    if(state==='Offen')box.append(button('Deaktivieren',async()=>{
@@ -175,13 +166,10 @@ else {
   const msg=$('admin-status');msg.textContent='Admin-Daten werden geladen …';
   try{
    const {data,error}=await client.rpc('ruefner_admin_overview');if(error)throw error;
-   const deleted=await adminAction('list-deleted-players');
-   const deletedIds=new Set(deleted.deletedIds||[]);
    adminPlayers=data?.players||[];adminGames=data?.games||[];
-   activePlayers=adminPlayers.filter(p=>!deletedIds.has(p.id));
    showPlayers();showGames();
    const invites=await adminAction('list-invites');showInvites(invites.invites||[]);
-   msg.textContent=activePlayers.length+' Spieler · '+adminGames.length+' Online-Spiele';
+   msg.textContent=adminPlayers.length+' Spieler · '+adminGames.length+' Online-Spiele';
   }catch(e){msg.textContent='Admin-Zentrale: '+(e.message||'Unbekannter Fehler');}
  }
  $('invite-create').addEventListener('click',async()=>{
