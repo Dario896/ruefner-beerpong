@@ -162,6 +162,7 @@ else {
  function showInvites(invites){
   const root=$('admin-invites');root.replaceChildren();
   for(const inv of invites){
+   if(inv.used_at)continue;
    const state=inv.revoked_at?'Deaktiviert':inv.used_at?'Verwendet':'Offen';
    const box=el('div',undefined,'notice');box.append(el('span',new Date(inv.created_at).toLocaleDateString('de-CH')+' · '+state));
    if(state==='Offen')box.append(button('Deaktivieren',async()=>{
