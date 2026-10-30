@@ -250,3 +250,12 @@
 .game-screen .victory-buttons{display:flex;flex-direction:column;gap:10px;margin-top:20px;}
 .game-screen .victory-buttons .btn{width:100%;min-height:48px;}
 @keyframes victoryAppear{from{opacity:0;transform:scale(.9)}to{opacity:1;transform:scale(1)}}
+
+/* V4.2: Einheitliche Hinweise und Bestätigungen statt Browser-Pop-ups. */
+.app-dialog-backdrop{position:fixed;inset:0;z-index:250;display:grid;place-items:center;background:#06131de0;padding:16px;}
+.app-dialog-card{width:min(440px,100%);border:2px solid #83b7dc;border-radius:20px;background:linear-gradient(150deg,#203a4d,#101e2d);box-shadow:0 0 35px #319dff44,0 24px 65px #000b;text-align:center;padding:24px 20px;color:#f4f6f8;}
+.app-dialog-icon{font-size:38px;margin-bottom:8px;}
+.app-dialog-card h2{margin:0 0 12px;font-size:clamp(23px,5vw,30px);color:#a6d8ff;text-shadow:0 0 14px #319dff66;}
+.app-dialog-card p{white-space:pre-line;line-height:1.5;color:#d7e7f4;margin:0 0 22px;overflow-wrap:anywhere;}
+.app-dialog-buttons{display:flex;flex-direction:column;gap:10px;}
+.app-dialog-buttons .btn{width:100%;min-height:46px;}
