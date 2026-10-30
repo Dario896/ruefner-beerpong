@@ -201,3 +201,23 @@
 .compact-stats td .avatar{width:33px;height:33px;flex:none;}
 .player-stats-heading{display:flex;align-items:center;gap:10px;}
 .player-stats-heading .avatar{width:48px;height:48px;}
+
+/* V3.7.1 – Spielername leuchtet nur als Schrift, ohne rechteckigen Effekt. */
+.game-screen .table-side-label.is-active .player-status,
+.game-screen .table-side-label.is-active .player-status strong,
+.game-screen .table-side-label.is-active .throw-count {
+  background:transparent!important;
+  background-image:none!important;
+  box-shadow:none!important;
+  outline:none!important;
+  border:0!important;
+  filter:none!important;
+}
+.game-screen .table-side-label.player-top.is-active .player-status strong {
+  color:#ff8ca1!important;
+  text-shadow:0 0 7px #ff426c,0 0 17px #ff426c,0 0 28px #ff426c88!important;
+}
+.game-screen .table-side-label.player-bottom.is-active .player-status strong {
+  color:#7dc8ff!important;
+  text-shadow:0 0 7px #319dff,0 0 17px #319dff,0 0 28px #319dff88!important;
+}
