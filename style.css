@@ -190,3 +190,14 @@
 }
 @media(max-width:360px){.game-screen .matchstack{--cup-scale:clamp(.8,calc((100vw - 20px)/310px),1.1);}}
 @media(max-height:700px) and (max-width:650px){.game-screen .matchstack .cupfield{height:auto!important;min-height:0!important;}}
+
+/* V3.7: only status text glows; never a rectangular highlight. */
+.game-screen .table-side-label.is-active .player-status,.game-screen .table-side-label.is-active .player-status strong,.game-screen .table-side-label.is-active .throw-count{background:none!important;box-shadow:none!important;filter:none!important;outline:0!important;}
+.game-screen .table-side-label.is-active .player-status strong{display:inline!important;padding:0!important;border:0!important;border-radius:0!important;}
+/* Trickshot flash catches and dismisses the next tap; it must not register a throw. */
+.trick-flash{pointer-events:auto!important;cursor:pointer;touch-action:manipulation;}
+/* Profile pictures in the online ranking and individual statistics. */
+.compact-stats td .btn{display:inline-flex;align-items:center;gap:8px;text-align:left;}
+.compact-stats td .avatar{width:33px;height:33px;flex:none;}
+.player-stats-heading{display:flex;align-items:center;gap:10px;}
+.player-stats-heading .avatar{width:48px;height:48px;}
