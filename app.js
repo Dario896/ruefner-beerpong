@@ -308,7 +308,7 @@ function cupBoard(sideIndex){
  return `<div class="cupfield ${sideIndex===1?'upper-field':'lower-field'} ${sideIndex===target?'attack-board':'defence-board'}" onclick="boardMiss(event,${sideIndex})"><div class="cups ${sideIndex===1?'board-top':'board-bottom'}">${s.cups.map(c=>{
   const pos=s.positions[c]||{x:145,y:115};const canTap=active&&(ui.ownGoal||!pending||allowed.includes(c));
   const depth=sideIndex===1?230-pos.y:pos.y;
-  return `<button class="cup ${sideIndex===1?'red':'blue'} ${(pending&&allowed.includes(c))||(ui.ownGoal&&sideIndex===match.turn)?'candidate':''} ${match.round.some(q=>q.cup===c&&q.side===sideIndex)?'pending':''}" style="left:${pos.x/290*100}%;top:${pos.y/230*100}%;z-index:${Math.round(depth)}" ${canTap?'':'disabled'} onclick="tapCup(${sideIndex},${c});event.stopPropagation()" aria-label="Becher ${c+1}"></button>`;
+  return `<button class="cup ${sideIndex===1?'red':'blue'} ${(pending&&allowed.includes(c))||(ui.ownGoal&&sideIndex===match.turn)?'candidate':''} ${match.round.some(q=>q.cup===c&&q.side===sideIndex)?'pending':''}" style="left:${pos.x/290*100}%;top:${(sideIndex===1?230-pos.y:pos.y)/230*100}%;z-index:${Math.round(sideIndex===1?230-pos.y:pos.y)}" ${canTap?'':'disabled'} onclick="tapCup(${sideIndex},${c});event.stopPropagation()" aria-label="Becher ${c+1}"></button>`;
  }).join('')}</div></div>`;
 }
 function boardMiss(e,side){if(ui.ownGoal)return;if(e.target.closest('button')||side!==boardIndex()||match.pending||match.finished||!isHumanTurn()||match.awaitingTrick)return;missShot()}

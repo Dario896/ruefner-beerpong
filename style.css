@@ -170,3 +170,23 @@
 .game-screen .table-side-label.is-active .player-status strong{color:inherit;text-shadow:inherit;}
 .game-screen .table-side-label:not(.is-active) .player-status{color:#e9f3fa;text-shadow:0 2px 6px #000a;}
 @media(max-width:390px){.game-screen .table-side-label .player-status{gap:3px}.game-screen .table-side-label strong{font-size:clamp(14px,4vw,18px)}.game-screen .table-side-label .throw-count{font-size:clamp(11px,3vw,14px)}}
+
+/* V3.6 – volle Smartphone-Hoehe, aufrechte Becher, einheitlicher Neon-Status. */
+.game-screen .matchstack{height:calc(100dvh - 8px);min-height:620px;max-height:none;--cup-scale:1.22;}
+.game-screen .matchstack .cupfield{height:auto!important;min-height:0!important;flex:1 1 0;overflow:visible;}
+/* Die obere Pyramide wird durch gespiegelte Y-Koordinaten gezeichnet, NICHT durch Drehen der Becher. */
+.game-screen .matchstack .board-top{transform:scale(var(--cup-scale))!important;}
+.game-screen .matchstack .board-top .cup{transform:translate(-50%,-50%)!important;}
+.game-screen .table-side-label{flex:none;min-height:68px;}
+.game-screen .table-side-label.is-active .avatar{border:3px solid #82caff;box-shadow:0 0 0 2px #78caff55,0 0 14px #44b4ff,0 0 26px #44b4ff66;}
+.game-screen .table-side-label.player-top.is-active .avatar{border-color:#ff8299;box-shadow:0 0 0 2px #ff829955,0 0 14px #ff416e,0 0 26px #ff416e66;}
+.game-screen .table-side-label.is-active .player-status,.game-screen .table-side-label.is-active .player-status strong,.game-screen .table-side-label.is-active .throw-count{font-weight:800!important;color:inherit!important;text-shadow:inherit!important;background:transparent!important;-webkit-text-fill-color:currentColor!important;}
+.game-screen .table-side-label.player-bottom.is-active .player-status,.game-screen .table-side-label.player-bottom.is-active .player-status strong,.game-screen .table-side-label.player-bottom.is-active .throw-count{color:#7dc8ff!important;text-shadow:0 0 7px #319dff,0 0 17px #319dff,0 0 28px #319dff88!important;}
+.game-screen .table-side-label.player-top.is-active .player-status,.game-screen .table-side-label.player-top.is-active .player-status strong,.game-screen .table-side-label.player-top.is-active .throw-count{color:#ff8ca1!important;text-shadow:0 0 7px #ff426c,0 0 17px #ff426c,0 0 28px #ff426c88!important;}
+@media(max-width:650px){
+ .game-screen .matchstack{--cup-scale:clamp(.86,calc((100vw - 20px)/300px),1.32);height:calc(100dvh - 8px);min-height:0;}
+ .game-screen .matchstack .cupfield{height:auto!important;min-height:0!important;flex:1 1 0;}
+ .game-screen .table-side-label{min-height:64px;}
+}
+@media(max-width:360px){.game-screen .matchstack{--cup-scale:clamp(.8,calc((100vw - 20px)/310px),1.1);}}
+@media(max-height:700px) and (max-width:650px){.game-screen .matchstack .cupfield{height:auto!important;min-height:0!important;}}
