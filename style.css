@@ -233,3 +233,10 @@
   color:#7dc8ff!important;
   text-shadow:0 0 7px #319dff,0 0 17px #319dff,0 0 28px #319dff88!important;
 }
+
+/* V3.9: Der rechteckige Neon-Rand entsteht durch abgeschnittenen text-shadow.
+   Die Namensschrift darf ihren Leuchtschein ausserhalb der Textbox zeichnen. */
+.game-screen .table-side-label .player-status strong {
+  overflow:visible!important;
+  text-overflow:clip!important;
+}
