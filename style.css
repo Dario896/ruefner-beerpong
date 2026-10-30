@@ -157,53 +157,16 @@
 @media(max-width:360px){.game-screen .matchstack{--cup-scale:.85;}.game-screen .game-actions{left:3px;}}
 @media(max-height:700px) and (max-width:650px){.game-screen .matchstack .cupfield{height:clamp(195px,34dvh,260px)!important;}}
 
-/* V3.4 – Neon-Spielfeld nach freigegebener Skizze. Nur Darstellung. */
-.game-screen .matchstack{
-  --cup-scale:clamp(.88,calc((100vw - 28px)/290),1.48);
-  background:repeating-linear-gradient(145deg,rgba(77,120,155,.095) 0 2px,transparent 2px 23px),linear-gradient(145deg,#14283c 0%,#0b1a2b 54%,#122b42 100%);
-  border:2px solid #405f79;
-  box-shadow:inset 0 0 0 1px #6d95b344,0 10px 30px #0008;
-}
-.game-screen .matchstack .cupfield{height:clamp(255px,35dvh,385px)!important;}
-.game-screen .matchstack .cups{transform:scale(var(--cup-scale))!important;}
-.game-screen .matchstack .board-top{transform:scale(var(--cup-scale)) rotate(180deg)!important;}
-.game-screen .matchstack .cup{width:49px!important;height:67px!important;filter:drop-shadow(0 6px 4px #0009);}
-.game-screen .matchstack .cup::before{top:12px;bottom:0;left:3px;right:3px;clip-path:polygon(0 0,100% 0,83% 100%,17% 100%);background:linear-gradient(90deg,#791426 0%,#f65a6b 28%,#db2e49 68%,#7a1428 100%);}
-.game-screen .matchstack .cup::after{top:1px;height:24px;border-width:4px;border-color:#ffe2e5;background:radial-gradient(ellipse at 50% 45%,#630b1b 0 56%,#bb1f37 69%,#ff7b87 100%);box-shadow:0 2px 4px #0009,inset 0 2px 3px #0007;}
-.game-screen .matchstack .cup.blue::before{background:linear-gradient(90deg,#06427e,#54b7ff 27%,#147bdc 68%,#073b79);}
-.game-screen .matchstack .cup.blue::after{border-color:#dff4ff;background:radial-gradient(ellipse at 50% 45%,#0a3976 0 56%,#1572c6 69%,#72caff 100%);}
-.game-screen .table-side-label{min-height:69px;padding:9px 65px 9px 15px;gap:12px;}
-.game-screen .table-side-label.player-top{margin-bottom:0;}
-.game-screen .table-side-label.player-bottom{padding-bottom:13px;}
-.game-screen .table-side-label .avatar{width:48px;height:48px;border:2px solid #7095ad;box-shadow:0 0 9px #5ba9f244;}
-.game-screen .table-side-label .player-label{display:flex;flex:1;gap:4px 10px;align-items:center;}
-.game-screen .table-side-label strong{font-size:clamp(17px,4.7vw,27px);}
-.game-screen .table-side-label .throw-count{display:none;}
-.game-screen .table-side-label.is-active .avatar{border-color:currentColor;box-shadow:0 0 15px currentColor;}
-.game-screen .table-side-label.player-top.is-active strong{color:#ffe5e9;text-shadow:0 0 7px #ff405d,0 0 19px #ff355f;}
-.game-screen .table-side-label.player-bottom.is-active strong{color:#e1f5ff;text-shadow:0 0 7px #3a9cff,0 0 19px #248aff;}
-.game-screen .cup-score{display:inline-flex;align-items:center;gap:6px;font-size:clamp(18px,5vw,27px);font-weight:900;margin-left:auto;white-space:nowrap;}
-.game-screen .cup-score i{width:clamp(16px,4.5vw,26px);height:clamp(16px,4.5vw,26px);border-radius:50%;display:inline-block;}
-.game-screen .red-score i{background:radial-gradient(circle at 30% 25%,#ff8d9b,#f0204a 65%,#7b0025);box-shadow:0 0 12px #ff315777;}
-.game-screen .blue-score i{background:radial-gradient(circle at 30% 25%,#a2e1ff,#188bff 65%,#003b8b);box-shadow:0 0 12px #258fff88;}
-.game-screen .throw-status{order:4;align-self:center;z-index:4;text-align:center;font-weight:900;font-size:clamp(15px,4.5vw,21px);padding:4px 16px 5px;letter-spacing:.2px;}
-.game-screen .throw-status.blue-turn{color:#e3f6ff;text-shadow:0 0 10px #009dff,0 0 22px #008bff;}
-.game-screen .throw-status.red-turn{color:#ffe5e9;text-shadow:0 0 10px #ff365c,0 0 22px #ff365c;}
-.game-screen .table-side-label.player-bottom{order:5;}
-.game-screen .game-actions{left:8px;gap:12px;}
-.game-screen .game-actions .action-icon{width:clamp(46px,12vw,62px);height:clamp(46px,12vw,62px);border-radius:17px;background:linear-gradient(145deg,#18334eea,#08182de9);font-size:25px;transition:box-shadow .2s,transform .2s,filter .2s;}
-.game-screen .game-actions .undo-icon{border-color:#65c4ff;box-shadow:0 0 7px #27a6ff,0 0 17px #1b8fff88,inset 0 0 10px #1175d644;}
-.game-screen .game-actions .action-icon:has(+ .action-icon){color:#fff;}
-.game-screen .game-actions .action-icon:nth-child(2){border-color:#b981ff;box-shadow:0 0 7px #b369ff,0 0 17px #9745ed88,inset 0 0 10px #9b43ff44;}
-.game-screen .game-actions .action-icon:nth-child(3){border-color:#ff637d;box-shadow:0 0 7px #ff405e,0 0 17px #f6325488,inset 0 0 10px #e5314e44;}
-.game-screen .game-actions .action-icon:active{transform:scale(.94);filter:brightness(1.3);}
-.game-screen .game-exit{border-color:#6688a4;box-shadow:0 0 8px #7db9e933;}
-@media(max-width:650px){
-  .game-screen .matchstack{--cup-scale:clamp(.82,calc((100vw - 24px)/290),1.45);}
-  .game-screen .matchstack .cupfield{height:clamp(245px,35dvh,365px)!important;}
-  .game-screen .table-side-label{padding-left:12px;min-height:63px;}
-  .game-screen .game-actions{left:5px;}
-}
-@media(max-width:365px){.game-screen .matchstack{--cup-scale:clamp(.77,calc((100vw - 24px)/290),1.2);}.game-screen .game-actions .action-icon{width:43px;height:43px;}}
-@media(max-height:740px) and (max-width:650px){.game-screen .matchstack .cupfield{height:clamp(210px,34dvh,270px)!important;}}
-@media(prefers-reduced-motion:no-preference){.game-screen .table-side-label.is-active strong{animation:playerNeon 2.8s ease-in-out infinite alternate;}@keyframes playerNeon{to{filter:brightness(1.25)}}}
+/* V3.5: Aufrechte rote Becher, aktive Namen und Wurftext als eine Neonzeile. */
+.game-screen .matchstack .board-top .cup{transform:translate(-50%,-50%)!important;}
+.game-screen .table-side-label .player-label{display:flex;align-items:center;min-width:0;flex:1;}
+.game-screen .table-side-label .player-status{display:inline-flex;align-items:baseline;gap:5px;min-width:0;max-width:100%;white-space:nowrap;}
+.game-screen .table-side-label .player-status strong{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;}
+.game-screen .table-side-label .throw-count{display:inline;flex:none;font-weight:800;font-size:clamp(12px,3.2vw,17px);color:inherit;}
+.game-screen .table-side-label.player-top.is-active .player-status,
+.game-screen .table-side-label.player-top.is-active .throw-count{color:#ff8ca1!important;text-shadow:0 0 7px #ff426c,0 0 17px #ff426c,0 0 28px #ff426c88;}
+.game-screen .table-side-label.player-bottom.is-active .player-status,
+.game-screen .table-side-label.player-bottom.is-active .throw-count{color:#7dc8ff!important;text-shadow:0 0 7px #319dff,0 0 17px #319dff,0 0 28px #319dff88;}
+.game-screen .table-side-label.is-active .player-status strong{color:inherit;text-shadow:inherit;}
+.game-screen .table-side-label:not(.is-active) .player-status{color:#e9f3fa;text-shadow:0 2px 6px #000a;}
+@media(max-width:390px){.game-screen .table-side-label .player-status{gap:3px}.game-screen .table-side-label strong{font-size:clamp(14px,4vw,18px)}.game-screen .table-side-label .throw-count{font-size:clamp(11px,3vw,14px)}}
