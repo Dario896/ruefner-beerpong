@@ -312,3 +312,14 @@
 
 /* V4.7.1 – Logo auf Mobilgeraeten nutzt die freie Flaeche links */
 @media(max-width:650px){.top .brand{font-size:clamp(27px,8.2vw,38px);letter-spacing:-1px;line-height:1.07;flex:1 1 auto;min-width:0}.top .brand-lines{gap:3px}.top-actions{flex:0 0 auto}}
+
+/* V4.7.2 – Wortmarke ohne Emoji, maximaler Platz links; Navigation unveraendert */
+.top .brand{gap:0;min-width:0;flex:1 1 auto;}
+.top .brand-lines{min-width:0;}
+@media(max-width:650px){
+  .top{gap:8px;}
+  .top .brand{font-size:clamp(32px, 9.4vw, 46px);letter-spacing:-1.4px;line-height:1.02;padding-top:3px;}
+  .top .brand-lines{gap:4px;}
+  .top-actions{flex:0 0 auto;}
+}
+@media(max-width:370px){.top .brand{font-size:clamp(28px, 8.6vw, 35px);}}

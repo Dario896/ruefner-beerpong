@@ -62,7 +62,7 @@ function btn(text,fn,cls=''){return `<button class="btn ${cls}" onclick="${fn}">
 let onlineNavRole=null,onlineNavName='',onlineUserId=null;
 function header(){
  const account=onlineNavRole==='player'?'<a class="btn secondary" href="online.html?logout=1">🚪 Abmelden</a>':`<a class="btn secondary" href="online.html">${onlineNavRole==='admin'?'👑 Admin':'🔐 Online'}</a>`;
- return `<div class="top"><div class="brand" onclick="go('home')" style="cursor:pointer">🏓 <span class="brand-lines"><span class="brand-main">Rüfner</span><span class="brand-accent">Beer Pong</span></span></div><div class="top-actions">${btn('☰ Menü',"go('home')",'secondary')}${account}</div></div>`;
+ return `<div class="top"><div class="brand" onclick="go('home')" style="cursor:pointer"><span class="brand-lines"><span class="brand-main">Rüfner</span><span class="brand-accent">Beer Pong</span></span></div><div class="top-actions">${btn('☰ Menü',"go('home')",'secondary')}${account}</div></div>`;
 }
 function render(){const root=document.getElementById('app');let body='';try{body=({home,profiles,profileDetail,training,friendship,league,stats,playerStats,rules,game,history:historyPage,firstThrow})[view]?.()||home()}catch(e){body=`<div class="notice">Fehler: ${esc(e.message)}</div>${btn('Zurück',"go('home')")}`};root.innerHTML=`<div class="shell ${view==='game'?'shell-game':''}">${view==='game'?'':header()}${body}${view==='game'?'':'<footer>Rüfner Beer Pong</footer>'}</div>${appDialogMarkup()}${profileZoomMarkup()}${profileStatusEditorMarkup()}`}
 let appDialog=null;
