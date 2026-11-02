@@ -35,6 +35,7 @@ function go(v){
  if(view===v&&v!=='profiles'){render();return;}
  window.history.pushState({ruefnerView:v,profileId:selectedProfileId},'','#'+v);
  view=v;ui={};profileZoom=false;render();
+ if(v==='stats'&&onlineUserId)setTimeout(()=>refreshCloudResults(),0);
 }
 function openPlayerProfile(pid){
  selectedProfileId=pid;profileZoom=false;profileStatusEditor=false;
@@ -52,6 +53,7 @@ window.addEventListener('popstate',()=>{
  }
  const target=window.history.state;
  view=target?.ruefnerView||'home';selectedProfileId=target?.profileId||null;
+ if(view==='playerStats'&&target?.playerStatsId)ui.playerStats=target.playerStatsId;
  if(!['home','profiles','profileDetail','training','friendship','league','stats','playerStats','rules','game','history','firstThrow'].includes(view))view='home';
  if(view==='game'&&!match)view='home';
  ui={};render();
@@ -60,7 +62,7 @@ function btn(text,fn,cls=''){return `<button class="btn ${cls}" onclick="${fn}">
 let onlineNavRole=null,onlineNavName='',onlineUserId=null;
 function header(){
  const account=onlineNavRole==='player'?'<a class="btn secondary" href="online.html?logout=1">🚪 Abmelden</a>':`<a class="btn secondary" href="online.html">${onlineNavRole==='admin'?'👑 Admin':'🔐 Online'}</a>`;
- return `<div class="top"><div class="brand" onclick="go('home')" style="cursor:pointer">🏓 Rüfner <span>Beer Pong</span></div><div class="top-actions">${btn('☰ Menü',"go('home')",'secondary')}${account}</div></div>`;
+ return `<div class="top"><div class="brand" onclick="go('home')" style="cursor:pointer">🏓 <span class="brand-lines"><span class="brand-main">Rüfner</span><span class="brand-accent">Beer Pong</span></span></div><div class="top-actions">${btn('☰ Menü',"go('home')",'secondary')}${account}</div></div>`;
 }
 function render(){const root=document.getElementById('app');let body='';try{body=({home,profiles,profileDetail,training,friendship,league,stats,playerStats,rules,game,history:historyPage,firstThrow})[view]?.()||home()}catch(e){body=`<div class="notice">Fehler: ${esc(e.message)}</div>${btn('Zurück',"go('home')")}`};root.innerHTML=`<div class="shell ${view==='game'?'shell-game':''}">${view==='game'?'':header()}${body}${view==='game'?'':'<footer>Rüfner Beer Pong</footer>'}</div>${appDialogMarkup()}${profileZoomMarkup()}${profileStatusEditorMarkup()}`}
 let appDialog=null;
@@ -244,7 +246,7 @@ function cloudStatsTable(){
  if(!onlineDirectoryLoaded&&!onlineDirectoryLoading&&!onlineDirectoryError)setTimeout(loadOnlinePlayers,0);
  if(!cloudResultsLoaded&&!cloudResultsLoading&&!cloudResultsError)setTimeout(loadCloudResults,0);
  const periodResults=cloudResults.filter(g=>inStatsPeriod(g.played_at));
-  const n=periodResults.length,status=cloudResultsLoading?'Online-Statistik wird geladen …':cloudResultsError||(n===1?'1 Spiel':n+' Spiele');
+  const status=cloudResultsLoading?'Online-Statistik wird geladen …':cloudResultsError;
  const players=db.players.filter(p=>p.onlineId&&!p.isDeleted);
  const rows=players.map(p=>{
   const gs=periodResults.filter(g=>g.player_a===p.onlineId||g.player_b===p.onlineId);
@@ -258,9 +260,10 @@ function cloudStatsTable(){
   }
   return {p,games:gs.length,wins,bombs,shots,hits,combos,diff};
  }).sort((a,b)=>b.wins-a.wins||b.diff-a.diff);
- return `<div class="section"><h2>📊 Spielerstatistik</h2></div><div class="panel"><p class="muted">${esc(status)} ${btn('↻ Aktualisieren','refreshCloudResults()','secondary')}</p>${cloudResultsError?'<p class="muted">Bitte online anmelden.</p>':''}<div class="table-wrap"><table class="table compact-stats"><thead><tr><th>Spieler</th><th>Spiele</th><th>Siege</th><th>Quote</th></tr></thead><tbody>${rows.map(x=>`<tr><td><button class="btn secondary" onclick="openPlayerStats('${x.p.onlineId}')">${avatar(x.p.id)}<span>${esc(x.p.name)} ›</span></button></td><td>${x.games}</td><td>${x.wins}</td><td>${formatPct(x.wins,x.games)}</td></tr>`).join('')}</tbody></table></div></div>`;
+ return `<div class="section"><h2>📊 Spielerstatistik</h2></div><div class="panel">${status?`<p class="muted">${esc(status)}</p>`:''}${cloudResultsError?'<p class="muted">Bitte online anmelden.</p>':''}<div class="table-wrap"><table class="table compact-stats"><thead><tr><th>Spieler</th><th>Spiele</th><th>Siege</th><th>Quote</th></tr></thead><tbody>${rows.map(x=>`<tr><td><button class="stats-player-link" onclick="openPlayerStats('${x.p.onlineId}')">${avatar(x.p.id)}<span>${esc(x.p.name)}</span></button></td><td>${x.games}</td><td>${x.wins}</td><td>${formatPct(x.wins,x.games)}</td></tr>`).join('')}</tbody></table></div></div>`;
 }
-function openPlayerStats(onlineId){ui.playerStats=onlineId;view='playerStats';render();}
+function openPlayerStats(onlineId){ui.playerStats=onlineId;window.history.pushState({ruefnerView:'playerStats',playerStatsId:onlineId},'','#playerStats');view='playerStats';render();}
+function openStatsPhoto(pid){selectedProfileId=pid;openProfileZoom();}
 function formatPct(n,d){return d?(100*n/d).toFixed(1)+' %':'–';}
 function formatAvg(cups,turns){return turns>0?(cups/turns).toFixed(2):'–';}
 function playerStats(){
@@ -293,7 +296,7 @@ function playerStats(){
  const versus=onlineUserId&&onlineUserId!==pid?gs.filter(g=>(g.player_a===onlineUserId&&g.player_b===pid)||(g.player_b===onlineUserId&&g.player_a===pid)):[];
  const myWins=versus.filter(g=>g.winner===onlineUserId).length;
  const duel=onlineUserId&&onlineUserId!==pid?card('⚔️ Direktvergleich · Du gegen '+esc(p.name),row('Spiele gegeneinander',versus.length)+row('Deine Siege',myWins)+row('Deine Niederlagen',versus.length-myWins)+row('Deine Siegquote',formatPct(myWins,versus.length)),true):'';
- return `${periodControls()}<div class="section">${btn('← Rangliste',"go('stats')",'secondary')}<h2 class="player-stats-heading">${avatar(p.id)} ${esc(p.name)}</h2><p class="muted">${gs.length} Spiele · ${wins} Siege · ${gs.length-wins} Niederlagen</p></div>`+duel+
+ return `<div class="stats-back-row">${btn('← Zurück',"go('stats')",'secondary')}</div>${periodControls()}<div class="section player-stats-intro"><h2 class="player-stats-heading"><button class="stats-avatar-zoom" onclick="openStatsPhoto('${p.id}')" aria-label="Profilbild vergrössern">${avatar(p.id)}</button><span>${esc(p.name)}</span></h2>${p.status?`<p class="player-stats-status">${esc(p.status)}</p>`:''}</div>`+duel+
  card('🏆 Average',row('Gesamt-AVG',formatAvg(cups,turns))+row('Höchster Winning-AVG',rec(bestWin))+row('Höchster Losing-AVG',rec(bestLoss)),true)+
  card('🎯 Wurfstatistik',row('Geworfene Bälle',shots)+row('Treffer',hits)+row('Trefferquote',formatPct(hits,shots))+row('Trickshot-Versuche',trickAttempts||complete?trickAttempts:'–')+row('Trickshot-Trefferquote',formatPct(trickHits,trickAttempts)))+
  card('🏁 Finishstatistik',row('Finishversuche',finishAttempts||complete?finishAttempts:'–')+row('Erfolgreiche Finishes',finishHits||complete?finishHits:'–')+row('Finishquote',formatPct(finishHits,finishAttempts))+row('Normale Finishes',normalFinishes||complete?normalFinishes:'–')+row('Kombifinishes',comboFinishes||complete?comboFinishes:'–')+row('Bombenfinishes',bombFinishes||complete?bombFinishes:'–'))+
