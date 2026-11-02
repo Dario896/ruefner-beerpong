@@ -17,7 +17,7 @@ const formationPatterns={
 };
 const variantNames={6:['Grosse Pyramide'],5:['Full House 1','Full House 2','Full House 3'],4:['Vagina'],3:['Kleine Pyramide'],2:['Paar 1','Paar 2','Paar 3']};
 let db=load(),view='home',match=null,ui={},pendingStart=null;
-let selectedProfileId=null,profileZoom=false,profileStatusSaving=false;
+let selectedProfileId=null,profileZoom=false,profileStatusSaving=false,profileStatusEditor=false;
 let trickFlashTimer=null;
 function dismissTrickFlash(){if(!ui.trickFlash)return;ui.trickFlash=null;clearTimeout(trickFlashTimer);if(view==='game')render()}
 function showTrickFlash(label){ui.trickFlash={label,until:Date.now()+5000};clearTimeout(trickFlashTimer);trickFlashTimer=setTimeout(()=>{ui.trickFlash=null;if(view==='game')render()},5050)}
@@ -37,7 +37,7 @@ function go(v){
  view=v;ui={};profileZoom=false;render();
 }
 function openPlayerProfile(pid){
- selectedProfileId=pid;profileZoom=false;
+ selectedProfileId=pid;profileZoom=false;profileStatusEditor=false;
  window.history.pushState({ruefnerView:'profileDetail',profileId:pid},'','#profile-'+encodeURIComponent(pid));
  view='profileDetail';ui={};render();
 }
@@ -58,8 +58,11 @@ window.addEventListener('popstate',()=>{
 });
 function btn(text,fn,cls=''){return `<button class="btn ${cls}" onclick="${fn}">${text}</button>`}
 let onlineNavRole=null,onlineNavName='',onlineUserId=null;
-function header(){return `<div class="top"><div class="brand" onclick="go('home')" style="cursor:pointer">🏓 Rüfner <span>Beer Pong</span></div><div class="row">${db.current?`<span class="pill">${esc(name(db.current))}${reigningChampion()===db.current?' 👑':''}</span>`:''}${onlineNavRole==='player'?`<a class="btn secondary" style="text-decoration:none" href="online.html?logout=1">👤 ${esc(onlineNavName)} · Abmelden</a>`:`<a class="btn secondary" style="text-decoration:none" href="online.html">${onlineNavRole==='admin'?'👑 Admin':'🔐 Online'}</a>`}${btn('☰ Menü',"go('home')",'secondary')}</div></div>`}
-function render(){const root=document.getElementById('app');let body='';try{body=({home,profiles,profileDetail,training,friendship,league,stats,playerStats,rules,game,history:historyPage,firstThrow})[view]?.()||home()}catch(e){body=`<div class="notice">Fehler: ${esc(e.message)}</div>${btn('Zurück',"go('home')")}`};root.innerHTML=`<div class="shell ${view==='game'?'shell-game':''}">${view==='game'?'':header()}${body}${view==='game'?'':'<footer>Rüfner Beer Pong</footer>'}</div>${appDialogMarkup()}${profileZoomMarkup()}`}
+function header(){
+ const account=onlineNavRole==='player'?'<a class="btn secondary" href="online.html?logout=1">🚪 Abmelden</a>':`<a class="btn secondary" href="online.html">${onlineNavRole==='admin'?'👑 Admin':'🔐 Online'}</a>`;
+ return `<div class="top"><div class="brand" onclick="go('home')" style="cursor:pointer">🏓 Rüfner <span>Beer Pong</span></div><div class="top-actions">${btn('☰ Menü',"go('home')",'secondary')}${account}</div></div>`;
+}
+function render(){const root=document.getElementById('app');let body='';try{body=({home,profiles,profileDetail,training,friendship,league,stats,playerStats,rules,game,history:historyPage,firstThrow})[view]?.()||home()}catch(e){body=`<div class="notice">Fehler: ${esc(e.message)}</div>${btn('Zurück',"go('home')")}`};root.innerHTML=`<div class="shell ${view==='game'?'shell-game':''}">${view==='game'?'':header()}${body}${view==='game'?'':'<footer>Rüfner Beer Pong</footer>'}</div>${appDialogMarkup()}${profileZoomMarkup()}${profileStatusEditorMarkup()}`}
 let appDialog=null;
 function showAppAlert(message){appDialog={type:'alert',message:String(message)};render();}
 function showAppConfirm(message,onAccept){appDialog={type:'confirm',message:String(message),onAccept};render();}
@@ -84,7 +87,19 @@ function profileDetail(){
  if(!p||p.isDeleted)return `<div class="notice">Dieses Profil ist nicht mehr verfügbar.</div>${btn('Zu den Profilen',"go('profiles')")}`;
  const own=!!onlineUserId&&p.onlineId===onlineUserId;
  const status=p.status||'';
- return `<div class="section"><h2>👤 Spielerprofil</h2></div><div class="card profile-detail"><button class="profile-photo-button" onclick="openProfileZoom()" aria-label="Profilbild vergrössern">${avatar(p.id)}<small>🔍 Bild vergrössern</small></button><h2>${esc(p.name)} ${reigningChampion()===p.id?'👑':''}</h2><div class="profile-status"><strong>💬 Status</strong><p>${status?esc(status):'<span class="muted">Noch kein Status eingetragen.</span>'}</p></div>${own?`<div class="field"><label>Deinen Status bearbeiten (max. 160 Zeichen)</label><textarea id="ownProfileStatus" maxlength="160" rows="3" placeholder="Dein Status …">${esc(status)}</textarea></div>${btn(profileStatusSaving?'Speichert …':'💾 Status speichern','saveProfileStatus()',profileStatusSaving?'secondary':'')}<div class="row" style="margin-top:14px">${btn('📷 Profilbild ändern',"document.getElementById('ownPhotoInput').click()",'secondary')}</div><input id="ownPhotoInput" type="file" accept="image/*" style="display:none" onchange="photoProfile(event)"><p class="muted" id="photoStatus">Status und Bild sind für alle angemeldeten Spieler sichtbar.</p>`:''}</div>`;
+ return `<div class="section"><h2>👤 Spielerprofil</h2></div><div class="card profile-detail"><button class="profile-photo-button" onclick="openProfileZoom()" aria-label="Profilbild vergrössern">${avatar(p.id)}</button><h2>${esc(p.name)} ${reigningChampion()===p.id?'👑':''}</h2><div class="profile-status">${status?`<p>${esc(status)}</p>`:own?'':'<p class="muted">Noch kein Status eingetragen.</p>'}</div>${own?`<div class="profile-edit-buttons">${btn('📷 Profilbild ändern',"document.getElementById('ownPhotoInput').click()",'secondary')}${btn('✏️ Status ändern','openProfileStatusEditor()','secondary')}</div><input id="ownPhotoInput" type="file" accept="image/*" style="display:none" onchange="photoProfile(event)"><div id="photoStatus" class="muted"></div>`:''}</div>`;
+}
+function openProfileStatusEditor(){
+ const p=player(selectedProfileId);
+ if(!p||!onlineUserId||p.onlineId!==onlineUserId)return;
+ profileStatusEditor=true;render();
+}
+function closeProfileStatusEditor(){profileStatusEditor=false;render()}
+function profileStatusEditorMarkup(){
+ if(!profileStatusEditor)return '';
+ const p=player(selectedProfileId);
+ if(!p||p.onlineId!==onlineUserId)return '';
+ return `<div class="app-dialog-backdrop" role="dialog" aria-modal="true" aria-label="Status ändern"><div class="app-dialog-card profile-status-editor"><h2>Status ändern</h2><textarea id="ownProfileStatus" maxlength="160" rows="4" placeholder="Dein Status …">${esc(p.status||'')}</textarea><div class="app-dialog-buttons">${btn(profileStatusSaving?'Speichert …':'Speichern','saveProfileStatus()')}${btn('Abbrechen','closeProfileStatusEditor()','secondary')}</div></div></div>`;
 }
 function profileZoomMarkup(){
  if(!profileZoom)return '';
@@ -100,7 +115,7 @@ async function saveProfileStatus(){
   const {client,user}=await cloudUser();if(user.id!==p.onlineId)throw Error('Falsches Konto.');
   const {error}=await client.rpc('ruefner_set_profile_status',{new_status:status});
   if(error)throw error;
-  p.status=status;save();profileStatusSaving=false;render();
+  p.status=status;save();profileStatusSaving=false;profileStatusEditor=false;render();
  }catch(e){profileStatusSaving=false;showAppAlert('Status konnte nicht gespeichert werden: '+(e.message||e)+'. Bitte zuerst die V4.5-SQL-Datei in Supabase ausführen.');}
 }
 // Nur das authentifizierte Online-Profil darf das eigene Foto bearbeiten.
