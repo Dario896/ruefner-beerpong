@@ -825,7 +825,25 @@ function plPlayerStats(){
  card('🏁 Finishstatistik',row('Finishversuche',x.finishAttempts)+row('Erfolgreiche Finishes',x.finishHits)+row('Finishquote',formatPct(x.finishHits,x.finishAttempts))+row('Normale Finishes',normalFinishes)+row('Kombifinishes',comboFinishes)+row('Bombenfinishes',bombFinishes))+
  card('💣 Spezialstatistik',row('Bomben',x.bombs)+row('Kombinationen',x.combos)+row('Island-Versuche',x.islandAttempts)+row('Island-Treffer',x.islandHits)+row('Island-Trefferquote',formatPct(x.islandHits,x.islandAttempts))+row('Becherdifferenz',diff));
 }
-function standingsTable(rows,detailLeague=null){return `<div class="table-wrap"><table class="table compact-stats"><thead><tr><th>#</th><th>Spieler</th><th>Pkt.</th><th>Nights</th><th>+/-</th><th>💣</th></tr></thead><tbody>${rows.map((x,i)=>`<tr><td>${i+1}</td><td>${detailLeague?`<button class="stats-player-link" onclick="plPlayerDetail('${detailLeague.id}','${x.pid}')">${avatar(x.pid)}<span>${esc(name(x.pid))}</span></button>`:`<span class="stats-player-link">${avatar(x.pid)}<span>${esc(name(x.pid))}</span></span>`}</td><td><strong>${x.points}</strong></td><td>${x.nights}</td><td>${x.diff>0?'+':''}${x.diff}</td><td>${x.bombs}</td></tr>`).join('')}</tbody></table></div>`}
+function standingsTable(rows,detailLeague=null){return `<style>
+/* PL tables have SIX columns, unlike the four-column player stats. */
+.pl-standings{width:100%;table-layout:fixed;border-collapse:collapse}
+.pl-standings th:first-child,.pl-standings td:first-child{width:7%;text-align:left}
+.pl-standings th:nth-child(2),.pl-standings td:nth-child(2){width:35%;text-align:left}
+.pl-standings th:nth-child(n+3),.pl-standings td:nth-child(n+3){width:14.5%;text-align:center}
+.pl-standings td,.pl-standings th{padding:9px 4px}
+.pl-standings .stats-player-link{display:flex;gap:7px;align-items:center;max-width:100%;min-width:0;width:100%;}
+.pl-standings .stats-player-link .avatar{width:30px;height:30px;flex:0 0 30px}
+.pl-standings .stats-player-link span:last-child{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;overflow-wrap:normal}
+@media(max-width:520px){
+ .pl-standings th,.pl-standings td{padding:8px 2px;font-size:11px}
+ .pl-standings th:first-child,.pl-standings td:first-child{width:6%}
+ .pl-standings th:nth-child(2),.pl-standings td:nth-child(2){width:34%}
+ .pl-standings th:nth-child(n+3),.pl-standings td:nth-child(n+3){width:15%}
+ .pl-standings .stats-player-link{gap:4px;font-size:11px}
+ .pl-standings .stats-player-link .avatar{width:23px;height:23px;flex-basis:23px}
+}
+</style><div class="table-wrap"><table class="table compact-stats pl-standings"><thead><tr><th>#</th><th>Spieler</th><th>Pkt.</th><th>Nights</th><th>+/-</th><th>💣</th></tr></thead><tbody>${rows.map((x,i)=>`<tr><td>${i+1}</td><td>${detailLeague?`<button class="stats-player-link" onclick="plPlayerDetail('${detailLeague.id}','${x.pid}')">${avatar(x.pid)}<span>${esc(name(x.pid))}</span></button>`:`<span class="stats-player-link">${avatar(x.pid)}<span>${esc(name(x.pid))}</span></span>`}</td><td><strong>${x.points}</strong></td><td>${x.nights}</td><td>${x.diff>0?'+':''}${x.diff}</td><td>${x.bombs}</td></tr>`).join('')}</tbody></table></div>`}
 function regularNight(l,n){
  const pairs=plPairs(l,n);
  const semi=pairs.map((pair,i)=>{
