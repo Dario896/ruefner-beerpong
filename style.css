@@ -353,3 +353,6 @@
 @media(max-width:390px){
   .top .brand{font-size:clamp(37px,10.7vw,46px);letter-spacing:-1.7px;}
 }
+/* Island: nur bei einem wirklich alleinstehenden gegnerischen Becher aktiv. */
+.game-actions .island-action:disabled{opacity:.33;filter:grayscale(1);cursor:not-allowed;}
+.game-actions .island-action.island-on{background:#ffbb55;color:#14252c;box-shadow:0 0 0 3px rgba(255,187,85,.35),0 0 20px rgba(255,187,85,.45);}

@@ -381,27 +381,50 @@ function finishTrick(){
 function isComTurn(){return match.kind==='training'&&match.turn===1}
 function isHumanTurn(){return !isComTurn()}
 function boardIndex(){return 1-match.turn}
+function islandCandidates(){
+ if(!match||match.finished)return [];
+ const s=match.sides[boardIndex()];
+ return s.cups.filter(c=>!s.cups.some(other=>other!==c&&Math.hypot(s.positions[c].x-s.positions[other].x,s.positions[c].y-s.positions[other].y)<56));
+}
+function canIsland(){return !!match&&!match.finished&&!match.pending&&!ui.ownGoal&&!isComTurn()&&!match.awaitingTrick&&!match.bonusPhase&&!match.islandActive&&match.round.length<2&&islandCandidates().length>0;}
+function toggleIsland(){if(!match||match.finished||match.pending||isComTurn()||match.awaitingTrick||match.bonusPhase||ui.ownGoal)return;if(ui.islandActive){ui.islandActive=false;render();return;}if(!canIsland())return;ui.islandActive=true;render();}
+function islandSelectionDone(){
+ const p=match.islandChoice;match.islandChoice=null;
+ if(p?.kind==='hit'){
+  // The hit cup stays available until round resolution so a second ball can hit it (bomb).
+  // A bonus selection must never choose an already-hit cup.
+ }
+ if(checkWin())return;
+ if(match.round.length===2)resolveRound();else render();
+}
+function chooseIslandBonus(side,c){
+ const p=match?.islandChoice;
+ if(!p||p.side!==side||!p.allowed.includes(c))return;
+ snapshot();removeCups(side,[c]);islandSelectionDone();
+}
+
 function cupBoard(sideIndex){
  const s=match.sides[sideIndex],target=boardIndex(),pending=match.pending?.side===sideIndex,allowed=match.pending?.allowed||[];
+ const islandChoice=match.islandChoice&&match.islandChoice.side===sideIndex;
  const ownGoalActive=ui.ownGoal&&sideIndex===match.turn;
- const active=ui.ownGoal?ownGoalActive:(match.pending?pending:!match.finished&&isHumanTurn()&&sideIndex===target&&!match.awaitingTrick);
+ const active=match.islandChoice?islandChoice:(ui.ownGoal?ownGoalActive:(match.pending?pending:!match.finished&&isHumanTurn()&&sideIndex===target&&!match.awaitingTrick));
  return `<div class="cupfield ${sideIndex===1?'upper-field':'lower-field'} ${sideIndex===target?'attack-board':'defence-board'}" onclick="boardMiss(event,${sideIndex})"><div class="cups ${sideIndex===1?'board-top':'board-bottom'}">${s.cups.map(c=>{
-  const pos=s.positions[c]||{x:145,y:115};const canTap=active&&(ui.ownGoal||!pending||allowed.includes(c));
+  const pos=s.positions[c]||{x:145,y:115};const canTap=active&&(match.islandChoice?match.islandChoice.allowed.includes(c):(ui.ownGoal||!pending||allowed.includes(c)))&&(ui.islandActive?islandCandidates().includes(c):true);
   const depth=sideIndex===1?230-pos.y:pos.y;
-  return `<button class="cup ${sideIndex===1?'red':'blue'} ${(pending&&allowed.includes(c))||(ui.ownGoal&&sideIndex===match.turn)?'candidate':''} ${match.round.some(q=>q.cup===c&&q.side===sideIndex)?'pending':''}" style="left:${pos.x/290*100}%;top:${(sideIndex===1?230-pos.y:pos.y)/230*100}%;z-index:${Math.round(sideIndex===1?230-pos.y:pos.y)}" ${canTap?'':'disabled'} onclick="tapCup(${sideIndex},${c});event.stopPropagation()" aria-label="Becher ${c+1}"></button>`;
+  return `<button class="cup ${sideIndex===1?'red':'blue'} ${(pending&&allowed.includes(c))||(match.islandChoice?.side===sideIndex&&match.islandChoice.allowed.includes(c))||(ui.ownGoal&&sideIndex===match.turn)?'candidate':''} ${match.round.some(q=>q.cup===c&&q.side===sideIndex)?'pending':''}" style="left:${pos.x/290*100}%;top:${(sideIndex===1?230-pos.y:pos.y)/230*100}%;z-index:${Math.round(sideIndex===1?230-pos.y:pos.y)}" ${canTap?'':'disabled'} onclick="tapCup(${sideIndex},${c});event.stopPropagation()" aria-label="Becher ${c+1}"></button>`;
  }).join('')}</div></div>`;
 }
-function boardTableMiss(e){if(e.target.closest('button,.table-side-label,.game-actions,.game-exit,.trick-flash'))return;if(match?.pending||match?.finished||match?.awaitingTrick||ui.ownGoal||!isHumanTurn())return;missShot()}
-function boardMiss(e,side){if(ui.ownGoal)return;e.stopPropagation();if(e.target.closest('button')||match.pending||match.finished||!isHumanTurn()||match.awaitingTrick)return;missShot()}
+function boardTableMiss(e){if(e.target.closest('button,.table-side-label,.game-actions,.game-exit,.trick-flash'))return;if(match?.pending||match?.islandChoice||match?.finished||match?.awaitingTrick||ui.ownGoal||!isHumanTurn())return;missShot()}
+function boardMiss(e,side){if(ui.ownGoal)return;e.stopPropagation();if(e.target.closest('button')||match.pending||match.islandChoice||match.finished||!isHumanTurn()||match.awaitingTrick)return;missShot()}
 function game(){
  if(!match)return `<div class="notice">Kein aktives Spiel.</div>`;
  const a=match.a,b=match.b,owner=match.turn;
- const notice=ui.ownGoal?`⚽ Eigentor von ${esc(name([match.a,match.b][match.turn]))}: Tippe einen eigenen Becher an.`:match.pending?'💣 Bombe! Wähle die markierten Becher.':match.finished?'🏆 Spiel beendet.':match.awaitingTrick?'🎩 Wähle einen Trickshot für Rüfner 3000.':match.bonusPhase?`🎩 Trickshot: ${match.bonusType==null?'Frei wählbar':esc(trickNames[match.bonusType])} · jetzt ausführen!${trickCount()?' · danach noch ein Trickshot':''}`:`🎯 ${esc(name([a,b][owner]))} ist dran · Wurf ${match.round.length+1} von 2${trickCount()?' · '+trickCount()+' Trickshot(s) vorgemerkt':''}`;
- const controls=`<div class="game-actions">${btn('↶','undoShot()','secondary action-icon undo-icon')}${canRerack()?btn('🔄','showRerack()','secondary action-icon'):''}${!match.finished&&isHumanTurn()&&!match.pending&&!match.bonusPhase&&!match.awaitingTrick&&match.round.length<2?btn('🎩','requestTrick()','secondary action-icon'):''}${ui.ownGoal?btn('✕','cancelOwnGoal()','secondary action-icon own-goal-cancel'):''}${!ui.ownGoal&&!match.finished&&match.kind!=='training'&&!match.pending?btn('💀','deathCup()','secondary action-icon')+btn('⚽','ownGoal()','secondary action-icon'):''}</div>`;
- return `<div class="game-screen">${(match.pending||match.bonusPhase||match.awaitingTrick||ui.ownGoal)?`<div class="fullscreen-status" aria-live="polite">${notice}</div>`:''}<div class="table-with-actions"><div class="matchstack" onclick="boardTableMiss(event)"><div class="table-side-label player-top ${owner===1?'is-active':''}">${avatar(b)}<div class="player-label"><span class="player-status"><strong>${esc(name(b))}</strong>${owner===1?`<span class="throw-count"> · Wurf ${Math.min(match.round.length+1,2)} von 2</span>`:''}</span></div></div>${cupBoard(1)}<div class="table-middle-line"></div>${cupBoard(0)}<div class="table-side-label player-bottom ${owner===0?'is-active':''}">${avatar(a)}<div class="player-label"><span class="player-status"><strong>${esc(name(a))}</strong>${owner===0?`<span class="throw-count"> · Wurf ${Math.min(match.round.length+1,2)} von 2</span>`:''}</span></div></div>${controls}<button class="game-exit" onclick="cancelMatch()" aria-label="Spiel abbrechen">✕</button></div></div>${ui.rerack?rerackPanel():''}${ui.trickFlash&&Date.now()<ui.trickFlash.until?`<div class="trick-flash" role="status" aria-live="polite" onclick="dismissTrickFlash();event.stopPropagation()"><div class="trick-flash-inner"><div class="trick-flash-title">🎩 TRICKSHOT!</div><div class="trick-flash-task">${esc(ui.trickFlash.label)}</div></div></div>`:''}${match.awaitingTrick?`<div class="trick-choice-backdrop" role="dialog" aria-modal="true" aria-label="Trickshot für COM wählen"><div class="trick-choice-modal"><div class="trick-choice-title">🎩 RÜFNER 3000 TRICKSHOT!</div><p>Welchen Trickshot muss der COM machen?</p><div class="trick-choice-grid">${trickNames.map((t,i)=>`<button class="btn secondary" onclick="chooseComTrick(${i})">${esc(t)}</button>`).join('')}</div></div></div>`:''}${ui.deathCup&&!match.finished?`<div class="trick-choice-backdrop" role="dialog" aria-modal="true" aria-label="Death Cup Sieger wählen"><div class="trick-choice-modal"><div class="trick-choice-title">💀 DEATH CUP!</div><p>Wer ist der Sieger?</p><div class="trick-choice-grid">${btn('🔵 '+esc(name(match.a)),'chooseDeathCupWinner(0)')}${btn('🔴 '+esc(name(match.b)),'chooseDeathCupWinner(1)')}</div><p>${btn('Abbrechen','cancelDeathCup()','secondary')}</p></div></div>`:''}${match.finished?`<div class="victory-overlay" role="dialog" aria-modal="true" aria-label="Spiel beendet"><div class="victory-card"><div class="victory-trophy">🏆</div><h2>${esc(name(match.winner))} gewinnt!</h2>${match.kind==='training'?'':'<p>Was möchtest du mit dem Ergebnis machen?</p>'}<div class="victory-buttons">${match.kind==='training'?btn('🏠 Zurück zum Menü','finishMatch()'):btn(cloudSaving?'Speichert online …':'💾 Ergebnis speichern','finishMatch()',cloudSaving?'secondary':'')+btn('Nicht speichern','discardFinishedMatch()','secondary')}${btn('↶ Letzten Wurf rückgängig','undoShot()','secondary')}</div></div></div>`:''}<div class="panel match-stats"><div class="row between"><span class="muted">${esc(name(a))}: ${match.sides[0].hits}/${match.sides[0].shots} Treffer · ${match.sides[0].bombs} Bomben</span><span class="muted">${esc(name(b))}: ${match.sides[1].hits}/${match.sides[1].shots} Treffer · ${match.sides[1].bombs} Bomben</span></div></div></div>`;
+ const notice=match.islandChoice?(match.islandChoice.kind==='hit'?'🏝️ Island getroffen! Gegner wählt einen zusätzlichen Becher.':'🏝️ Island verfehlt! Wähle einen eigenen Becher zum Entfernen.'):ui.islandActive?'🏝️ Island angesagt! Alleinstehenden Becher treffen oder auf den Tisch tippen.':ui.ownGoal?`⚽ Eigentor von ${esc(name([match.a,match.b][match.turn]))}: Tippe einen eigenen Becher an.`:match.pending?'💣 Bombe! Wähle die markierten Becher.':match.finished?'🏆 Spiel beendet.':match.awaitingTrick?'🎩 Wähle einen Trickshot für Rüfner 3000.':match.bonusPhase?`🎩 Trickshot: ${match.bonusType==null?'Frei wählbar':esc(trickNames[match.bonusType])} · jetzt ausführen!${trickCount()?' · danach noch ein Trickshot':''}`:`🎯 ${esc(name([a,b][owner]))} ist dran · Wurf ${match.round.length+1} von 2${trickCount()?' · '+trickCount()+' Trickshot(s) vorgemerkt':''}`;
+ const controls=`<div class="game-actions">${btn('↶','undoShot()','secondary action-icon undo-icon')}${canRerack()?btn('🔄','showRerack()','secondary action-icon'):''}${!match.finished&&isHumanTurn()&&!match.pending&&!match.bonusPhase&&!match.awaitingTrick&&match.round.length<2?btn('🎩','requestTrick()','secondary action-icon'):''}${ui.ownGoal?btn('✕','cancelOwnGoal()','secondary action-icon own-goal-cancel'):''}${!ui.ownGoal&&!match.finished&&match.kind!=='training'&&!match.pending&&!match.islandChoice?btn('💀','deathCup()','secondary action-icon')+btn('⚽','ownGoal()','secondary action-icon'):''}${!match.finished&&!match.pending&&!match.islandChoice&&!isComTurn()?`<button class="btn secondary action-icon island-action ${ui.islandActive?'island-on':''}" onclick="toggleIsland()" ${ui.islandActive||canIsland()?'':'disabled'} aria-label="Island ansagen">🏝️</button>`:''}</div>`;
+ return `<div class="game-screen">${(match.pending||match.islandChoice||ui.islandActive||match.bonusPhase||match.awaitingTrick||ui.ownGoal)?`<div class="fullscreen-status" aria-live="polite">${notice}</div>`:''}<div class="table-with-actions"><div class="matchstack" onclick="boardTableMiss(event)"><div class="table-side-label player-top ${owner===1?'is-active':''}">${avatar(b)}<div class="player-label"><span class="player-status"><strong>${esc(name(b))}</strong>${owner===1?`<span class="throw-count"> · Wurf ${Math.min(match.round.length+1,2)} von 2</span>`:''}</span></div></div>${cupBoard(1)}<div class="table-middle-line"></div>${cupBoard(0)}<div class="table-side-label player-bottom ${owner===0?'is-active':''}">${avatar(a)}<div class="player-label"><span class="player-status"><strong>${esc(name(a))}</strong>${owner===0?`<span class="throw-count"> · Wurf ${Math.min(match.round.length+1,2)} von 2</span>`:''}</span></div></div>${controls}<button class="game-exit" onclick="cancelMatch()" aria-label="Spiel abbrechen">✕</button></div></div>${ui.rerack?rerackPanel():''}${ui.trickFlash&&Date.now()<ui.trickFlash.until?`<div class="trick-flash" role="status" aria-live="polite" onclick="dismissTrickFlash();event.stopPropagation()"><div class="trick-flash-inner"><div class="trick-flash-title">🎩 TRICKSHOT!</div><div class="trick-flash-task">${esc(ui.trickFlash.label)}</div></div></div>`:''}${match.awaitingTrick?`<div class="trick-choice-backdrop" role="dialog" aria-modal="true" aria-label="Trickshot für COM wählen"><div class="trick-choice-modal"><div class="trick-choice-title">🎩 RÜFNER 3000 TRICKSHOT!</div><p>Welchen Trickshot muss der COM machen?</p><div class="trick-choice-grid">${trickNames.map((t,i)=>`<button class="btn secondary" onclick="chooseComTrick(${i})">${esc(t)}</button>`).join('')}</div></div></div>`:''}${ui.deathCup&&!match.finished?`<div class="trick-choice-backdrop" role="dialog" aria-modal="true" aria-label="Death Cup Sieger wählen"><div class="trick-choice-modal"><div class="trick-choice-title">💀 DEATH CUP!</div><p>Wer ist der Sieger?</p><div class="trick-choice-grid">${btn('🔵 '+esc(name(match.a)),'chooseDeathCupWinner(0)')}${btn('🔴 '+esc(name(match.b)),'chooseDeathCupWinner(1)')}</div><p>${btn('Abbrechen','cancelDeathCup()','secondary')}</p></div></div>`:''}${match.finished?`<div class="victory-overlay" role="dialog" aria-modal="true" aria-label="Spiel beendet"><div class="victory-card"><div class="victory-trophy">🏆</div><h2>${esc(name(match.winner))} gewinnt!</h2>${match.kind==='training'?'':'<p>Was möchtest du mit dem Ergebnis machen?</p>'}<div class="victory-buttons">${match.kind==='training'?btn('🏠 Zurück zum Menü','finishMatch()'):btn(cloudSaving?'Speichert online …':'💾 Ergebnis speichern','finishMatch()',cloudSaving?'secondary':'')+btn('Nicht speichern','discardFinishedMatch()','secondary')}${btn('↶ Letzten Wurf rückgängig','undoShot()','secondary')}</div></div></div>`:''}<div class="panel match-stats"><div class="row between"><span class="muted">${esc(name(a))}: ${match.sides[0].hits}/${match.sides[0].shots} Treffer · ${match.sides[0].bombs} Bomben</span><span class="muted">${esc(name(b))}: ${match.sides[1].hits}/${match.sides[1].shots} Treffer · ${match.sides[1].bombs} Bomben</span></div></div></div>`;
 }
 function snapshot(){match.undo.push(JSON.stringify({...match,undo:[]}));if(match.undo.length>30)match.undo.shift()}
-function undoShot(){if(!match?.undo.length)return;const old=match.undo.pop(),remaining=match.undo;match=JSON.parse(old);match.undo=remaining;ui.rerack=false;render()}
+function undoShot(){if(!match?.undo.length)return;const old=match.undo.pop(),remaining=match.undo;match=JSON.parse(old);match.undo=remaining;ui.rerack=false;ui.islandActive=false;render()}
 function removeCups(side,cups){const s=match.sides[side];s.cups=s.cups.filter(c=>!cups.includes(c))}
 // Equilateral triangular cup grid: avoid tiny pixel rounding differences (53 vs 46).
 function bombDistance(origin,pos){
@@ -423,6 +446,7 @@ function settleBomb(){
 }
 function tapCup(side,c){
  if(!match||match.finished)return;
+ if(match.islandChoice){chooseIslandBonus(side,c);return;}
  if(ui.ownGoal){
   if(side!==match.turn||!match.sides[side].cups.includes(c))return;
   snapshot();ui.ownGoal=false;removeCups(side,[c]);if(!checkWin())render();return;
@@ -435,21 +459,30 @@ function tapCup(side,c){
   render();return;
  }
  if(side!==boardIndex()||isComTurn()||match.awaitingTrick)return;
+ if(ui.islandActive&&!islandCandidates().includes(c))return;
  snapshot();recordHit(side,c);
 }
 function recordHit(side,c){
  const own=match.sides[match.turn];const lastCup=match.sides[side].cups.length===1;const firstRegular=match.round.length===0&&!match.bonusPhase&&!match.comboActive&&!match.comboBonusThrows;own.shots++;own.hits++;if(lastCup){own.finishAttempts++;own.finishHits++;own.normalFinishes++;if(firstRegular)match.halfTurnWinner=match.turn;}if(match.bonusPhase){own.trickAttempts++;own.trickHits++;}
  if(match.bonusPhase){removeCups(side,[c]);finishTrick();return}
- if(match.comboBonusThrows>0)match.comboBonusThrows--;match.round.push({side,cup:c});
+ const island=!!ui.islandActive;ui.islandActive=false;
+ if(match.comboBonusThrows>0)match.comboBonusThrows--;match.round.push({side,cup:c,island});
+ if(island){
+  const hitCups=new Set(match.round.filter(q=>q.cup!==undefined).map(q=>q.cup));
+  const allowed=match.sides[side].cups.filter(x=>!hitCups.has(x));
+  if(allowed.length){match.islandChoice={kind:'hit',side,allowed};render();return;}
+ }
  if(match.sides[side].cups.length===1){removeCups(side,[c]);checkWin();return}
  if(match.round.length<2){render();return}
  resolveRound();
 }
 function missShot(){
- if(!match||match.finished||match.pending||isComTurn()||match.awaitingTrick)return;
+ if(!match||match.finished||match.pending||match.islandChoice||isComTurn()||match.awaitingTrick)return;
  snapshot();match.sides[match.turn].shots++;if(match.sides[boardIndex()].cups.length===1)match.sides[match.turn].finishAttempts++;if(match.bonusPhase)match.sides[match.turn].trickAttempts++;
  if(match.bonusPhase){finishTrick();return}
- if(match.comboBonusThrows>0)match.comboBonusThrows--;match.round.push({miss:true});
+ const island=!!ui.islandActive;ui.islandActive=false;
+ if(match.comboBonusThrows>0)match.comboBonusThrows--;match.round.push({miss:true,island});
+ if(island&&match.sides[match.turn].cups.length){match.islandChoice={kind:'miss',side:match.turn,allowed:[...match.sides[match.turn].cups]};render();return;}
  if(match.round.length===2)resolveRound();else render();
 }
 function resolveRound(){const r=match.round,side=boardIndex(),own=match.sides[match.turn];if(r.length!==2)return;const hits=r.filter(q=>q.cup!==undefined);if(hits.length===2&&hits[0].cup===hits[1].cup){own.bombs++;if(match.sides[side].cups.length<=4){own.finishAttempts++;own.finishHits++;own.bombFinishes++;}const c=hits[0].cup,origin=match.sides[side].positions[c];removeCups(side,[c]);if(match.sides[side].cups.length<=3){removeCups(side,[...match.sides[side].cups]);afterBomb();return}const remaining=3;if(remaining){match.pending={side,origin,remaining,allowed:[]};settleBomb();if(match.pending&&match.kind==='training'&&side===1){autoBomb();return}render();return}afterBomb();return}if(hits.length===2){own.combos++;if(match.sides[side].cups.length===2){own.finishAttempts++;own.finishHits++;own.comboFinishes++;}match.comboActive=true;match.comboBonusThrows=2;ui.rerack=false;removeCups(side,hits.map(q=>q.cup));match.round=[];if(checkWin())return;render();if(isComTurn())setTimeout(computerTurn,300);return}if(hits.length)removeCups(side,[hits[0].cup]);afterNormalRound()}
@@ -462,12 +495,12 @@ function afterNormalRound(){
 function checkWin(){
  if(match.sides[0].cups.length&&match.sides[1].cups.length)return false;
  ui.trickFlash=null;clearTimeout(trickFlashTimer);match.finished=true;match.winner=match.sides[0].cups.length===0?match.b:match.a;
- match.round=[];match.pending=null;match.bonus=false;match.tricks=0;match.bonusPhase=false;match.awaitingTrick=false;
+ match.round=[];match.pending=null;match.islandChoice=null;ui.islandActive=false;match.bonus=false;match.tricks=0;match.bonusPhase=false;match.awaitingTrick=false;
  render();return true;
 }
 function endRound(){
  if(checkWin())return;
- match.round=[];match.bonus=false;match.tricks=0;match.bonusPhase=false;match.bonusType=null;match.awaitingTrick=false;
+ match.round=[];match.islandChoice=null;ui.islandActive=false;match.bonus=false;match.tricks=0;match.bonusPhase=false;match.bonusType=null;match.awaitingTrick=false;
  match.turn=1-match.turn;match.sides[match.turn].turns++;match.comboActive=false;match.comboBonusThrows=0;ui.rerack=false;render();
  if(isComTurn())setTimeout(computerTurn,500);
 }
@@ -515,7 +548,7 @@ function computerTurn(){
  if(match.round.length===2)resolveRound();else{render();setTimeout(computerTurn,550)}
 }
 function canComRerack(){if(!match||match.kind!=='training'||match.turn!==1||match.finished||match.pending||match.round.length||match.comboActive||match.comboBonusThrows>0||match.bonusPhase||match.awaitingTrick)return false;const s=match.sides[0];return !s.reracked&&s.cups.length>=2&&s.cups.length<=6}
-function canRerack(){if(!match||match.finished||match.pending||match.round.length!==0||match.comboActive||match.comboBonusThrows>0||match.bonusPhase||match.awaitingTrick||isComTurn())return false;const s=match.sides[boardIndex()];return !s.reracked&&s.cups.length>=2&&s.cups.length<=6}
+function canRerack(){if(!match||match.finished||match.pending||match.islandChoice||ui.islandActive||match.round.length!==0||match.comboActive||match.comboBonusThrows>0||match.bonusPhase||match.awaitingTrick||isComTurn())return false;const s=match.sides[boardIndex()];return !s.reracked&&s.cups.length>=2&&s.cups.length<=6}
 function showRerack(){if(!canRerack())return;ui.rerack=true;render()}
 function formationPreview(n,v,side){
  const coords=formationCoords(n,v);
@@ -528,7 +561,7 @@ function deathCup(){if(!match||match.kind==='training'||match.finished||match.pe
 function cancelDeathCup(){ui.deathCup=false;render()}
 function chooseDeathCupWinner(side){
  if(!match||!ui.deathCup||match.finished||![0,1].includes(side))return;
- snapshot();match.finished=true;match.winner=[match.a,match.b][side];match.round=[];match.pending=null;match.bonus=false;match.tricks=0;match.bonusPhase=false;match.awaitingTrick=false;match.comboActive=false;
+ snapshot();match.finished=true;match.winner=[match.a,match.b][side];match.round=[];match.pending=null;match.islandChoice=null;ui.islandActive=false;match.bonus=false;match.tricks=0;match.bonusPhase=false;match.awaitingTrick=false;match.comboActive=false;
  ui.deathCup=false;render();
 }
 function ownGoal(){if(!match||match.kind==='training'||match.finished||match.pending)return;ui.ownGoal=true;ui.rerack=false;render()}
@@ -588,7 +621,7 @@ function stats(){
  // Lokale Trainingsergebnisse bleiben privat; die Premier League wird separat online angebunden.
  return `${periodControls()}${cloudStatsTable()}${leagueStatsOverview()}<div class="section"><h2>🤖 Höchster besiegter Rüfner 3000</h2></div><div class="panel">${db.players.filter(p=>!p.isDeleted).map(p=>`<p>${esc(p.name)}: <strong>${COM_NAMES[db.record[p.id]]||'Noch keiner'}</strong></p>`).join('')}</div>`;
 }
-function rules(){const sections=[['Aufstellen','10 Becher in Pyramidenform (4–3–2–1), mittig und ca. 10 cm von der Tischkante.'],['Anspiel','Ein Team beginnt mit zwei Würfen. Bei Uneinigkeit: Schere, Stein, Papier.'],['Werfen','Pro Team zwei Bälle pro Runde. Der Ellenbogen bleibt hinter der Tischkante.'],['Abwehren','Nicht direkte Würfe dürfen abgewehrt werden; direkte Würfe nicht. Bälle im Becher dürfen nicht herausgeblasen werden.'],['Kombinationen','Zwei unterschiedliche Becher: beide weg und zwei neue Würfe. Derselbe Becher: Bombe, dieser und drei nächstgelegene Becher weg, danach zwei neue Würfe.'],['Trickshot','Kommt der Ball ohne Fremdeinwirkung über die Tischmitte zurück, gibt es einen Trickshot.'],['Death Cup','Treffer in einen bereits getroffenen, aber noch stehenden Becher beendet das Spiel sofort.'],['Eigentor & umfallende Becher','Eigentore und umgefallene Becher haben eigene Strafregeln.'],['Zusammenstellen','Einmal pro Spiel, zu Beginn eines regulären eigenen Wurfs – niemals während einer Kombination oder ihrer Zusatzwürfe. Bei 6 Bechern grosse Pyramide; 5 Full House (3 Varianten); 4 Vagina; 3 kleine Pyramide; 2 Paar (3 Varianten).'],['Trinken','Getroffene Becher werden ausgetrunken; die Originalregeln enthalten zusätzliche Zeit- und Strafbestimmungen.']];return `<div class="section"><h2>📖 Rüfner Beer Pong Reglement</h2><p class="muted">Kurzübersicht. Das vollständige Originaldokument liegt der App bei.</p></div>${sections.map(([h,p])=>`<details><summary>${h}</summary><p>${p}</p></details>`).join('')}<div class="panel"><a class="btn" style="display:inline-block;text-decoration:none" href="reglement.pdf" target="_blank" rel="noopener">📄 Vollständiges Reglement (PDF)</a></div>`}
+function rules(){const sections=[['Aufstellen','10 Becher in Pyramidenform (4–3–2–1), mittig und ca. 10 cm von der Tischkante.'],['Anspiel','Ein Team beginnt mit zwei Würfen. Bei Uneinigkeit: Schere, Stein, Papier.'],['Werfen','Pro Team zwei Bälle pro Runde. Der Ellenbogen bleibt hinter der Tischkante.'],['Abwehren','Nicht direkte Würfe dürfen abgewehrt werden; direkte Würfe nicht. Bälle im Becher dürfen nicht herausgeblasen werden.'],['Kombinationen','Zwei unterschiedliche Becher: beide weg und zwei neue Würfe. Derselbe Becher: Bombe, dieser und drei nächstgelegene Becher weg, danach zwei neue Würfe.'],['Trickshot','Kommt der Ball ohne Fremdeinwirkung über die Tischmitte zurück, gibt es einen Trickshot.'],['Death Cup','Treffer in einen bereits getroffenen, aber noch stehenden Becher beendet das Spiel sofort.'],['Eigentor & umfallende Becher','Eigentore und umgefallene Becher haben eigene Strafregeln.'],['Island','Steht ein gegnerischer Becher allein, darf vor dem Wurf Island angesagt werden. Treffer: Gegner wählt einen zusätzlichen Becher zum Entfernen. Fehlwurf oder falscher Becher: ein eigener Becher wird entfernt. Island kann mit Kombinationen und Bomben kombiniert werden.'],['Zusammenstellen','Einmal pro Spiel, zu Beginn eines regulären eigenen Wurfs – niemals während einer Kombination oder ihrer Zusatzwürfe. Bei 6 Bechern grosse Pyramide; 5 Full House (3 Varianten); 4 Vagina; 3 kleine Pyramide; 2 Paar (3 Varianten).'],['Trinken','Getroffene Becher werden ausgetrunken; die Originalregeln enthalten zusätzliche Zeit- und Strafbestimmungen.']];return `<div class="section"><h2>📖 Rüfner Beer Pong Reglement</h2><p class="muted">Kurzübersicht. Das vollständige Originaldokument liegt der App bei.</p></div>${sections.map(([h,p])=>`<details><summary>${h}</summary><p>${p}</p></details>`).join('')}<div class="panel"><a class="btn" style="display:inline-block;text-decoration:none" href="reglement.pdf" target="_blank" rel="noopener">📄 Vollständiges Reglement (PDF)</a></div>`}
 window.history.replaceState({ruefnerView:'home'},'','#home');
 render();
 if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('./sw.js?v=37').catch(()=>{});
