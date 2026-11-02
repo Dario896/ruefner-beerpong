@@ -344,3 +344,12 @@
 @media(max-width:370px){
   .top .brand{font-size:clamp(32px,9.3vw,41px);letter-spacing:-1.5px;}
 }
+
+/* V4.7.5 – Schrift vergroessert, Zeilen bleiben zusammen; nur Mobil-Logo. */
+@media(max-width:650px){
+  .top .brand{font-size:clamp(43px,12vw,56px);line-height:.98;letter-spacing:-2px;}
+  .top .brand-lines{justify-content:flex-start;gap:0;}
+}
+@media(max-width:390px){
+  .top .brand{font-size:clamp(37px,10.7vw,46px);letter-spacing:-1.7px;}
+}
