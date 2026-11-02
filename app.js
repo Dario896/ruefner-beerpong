@@ -157,7 +157,7 @@ async function loadOnlinePlayers(){
    return;
   }
   const {data:profiles,error}=await client.from('player_profiles')
-   .select('id,username,is_blocked,is_deleted,status').order('username');
+   .select('id,username,is_blocked,is_deleted,status,best_com_level').order('username');
   if(error)throw error;
   if(!Array.isArray(profiles))throw Error('Keine Spielerliste erhalten.');
   let changed=false;
@@ -173,6 +173,19 @@ async function loadOnlinePlayers(){
    }else{
     db.players.push({id:'online-'+p.id,onlineId:p.id,name:p.username,status:p.status||'',photo:cfg.url+'/storage/v1/object/public/player-avatars/'+p.id+'/avatar.jpg',isDeleted:!!p.is_deleted});
     changed=true;
+   }
+   // Online-Rekord übernehmen, ohne einen höheren lokalen Rekord zu verlieren.
+   // Nur der Besitzer darf seinen lokalen Rekord an Supabase übertragen.
+   const current=db.players.find(x=>x.onlineId===p.id);
+   if(current){
+    const remote=Number.isInteger(p.best_com_level)&&p.best_com_level>=0&&p.best_com_level<=5?p.best_com_level:-1;
+    const local=Number.isInteger(db.record[current.id])?db.record[current.id]:-1;
+    const best=Math.max(remote,local);
+    if(best>local){db.record[current.id]=best;changed=true;}
+    if(p.id===user.id&&local>remote){
+     // Eine eventuell noch nicht synchronisierte Bestleistung nachtragen.
+     syncComRecord(local).catch(e=>console.warn('COM-Rekord-Synchronisierung:',e));
+    }
    }
    // Auch alte lokale Profile gleichen Namens ausblenden; Spiele und Ligen bleiben gespeichert.
    for(const local of db.players){
@@ -191,6 +204,14 @@ async function loadOnlinePlayers(){
  }
 }
 function reloadOnlinePlayers(){onlineDirectoryLoaded=false;loadOnlinePlayers();}
+async function syncComRecord(level){
+ if(!Number.isInteger(level)||level<0||level>5)return;
+ const {client}=await cloudUser();
+ const {data,error}=await client.rpc('ruefner_save_best_com',{p_level:level});
+ if(error)throw error;
+ const p=db.players.find(p=>p.onlineId===onlineUserId);
+ if(p){db.record[p.id]=Math.max(db.record[p.id]??-1,Number(data)??-1);save();}
+}
 
 
 // V2.6: Freundschaftsspiele online speichern und gemeinsame Statistik laden.
@@ -704,7 +725,16 @@ async function finishMatch(){
  }
  if(g.kind==='league'){match=null;go('league');return;}
  if(g.kind==='training'){
-  if(match.winner===match.a)db.record[match.a]=Math.max(db.record[match.a]??-1,match.difficulty);
+  if(match.winner===match.a){
+   const old=db.record[match.a]??-1;
+   db.record[match.a]=Math.max(old,match.difficulty);
+   save();
+   if(db.record[match.a]>old){
+    // Der lokale Rekord bleibt auch bei einem kurzfristigen Netzfehler erhalten.
+    try{await syncComRecord(db.record[match.a]);}
+    catch(e){console.warn('COM-Rekord noch nicht online:',e);}
+   }
+  }
  }else{
   if(!db.games.some(x=>x.id===g.id))db.games.push(g);
   if(g.kind==='league'){
