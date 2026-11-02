@@ -35,7 +35,8 @@ function go(v){
  if(view===v&&v!=='profiles'){render();return;}
  window.history.pushState({ruefnerView:v,profileId:selectedProfileId},'','#'+v);
  view=v;ui={};profileZoom=false;render();
- if(v==='stats'&&onlineUserId)setTimeout(()=>refreshCloudResults(),0);
+ if(v==='stats'&&onlineUserId)setTimeout(()=>{refreshCloudResults();refreshPlOnline()},0);
+ if(v==='league')setTimeout(()=>loadPlOnline(true),0);
 }
 function openPlayerProfile(pid){
  selectedProfileId=pid;profileZoom=false;profileStatusEditor=false;
@@ -211,6 +212,65 @@ async function cloudUser(){
  if(error||!user)throw Error('Bitte zuerst unter 🔐 Online anmelden.');
  return {client,user};
 }
+// PL online: read-only public season history for all authenticated users.
+let plLoading=false,plLoaded=false,plError='',plSaving=false;
+function plLocalId(uid){return db.players.find(p=>p.onlineId===uid&&!p.isDeleted)?.id||uid}
+function plOnlineId(pid){return cloudId(pid)|| (typeof pid==='string'&&/^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(pid)?pid:null)}
+function plName(pid){const p=player(pid);if(p)return p.name;return 'Spieler'}
+async function loadPlOnline(force=false){
+ if(plLoading||plLoaded&&!force)return;
+ plLoading=true;plError='';if(view==='league'||view==='stats')render();
+ try{
+  const {client}=await cloudUser();
+  if(!onlineDirectoryLoaded)await loadOnlinePlayers();
+  const [ss,ms]=await Promise.all([
+   client.from('ruefner_pl_seasons').select('*').order('created_at',{ascending:false}),
+   client.from('ruefner_pl_matches').select('*').order('played_at',{ascending:true})
+  ]);
+  if(ss.error)throw ss.error;if(ms.error)throw ms.error;
+  // Only PL data is synchronized. Existing friendlies, stats, and profiles are untouched.
+  const oldPL=new Set(db.leagues.filter(l=>l.online).flatMap(l=>l.games));
+  db.games=db.games.filter(g=>!oldPL.has(g.id));
+  db.leagues=db.leagues.filter(l=>!l.online);
+  for(const row of ss.data||[]){
+   db.leagues.push({id:row.id,title:row.title,participants:[row.player_1,row.player_2,row.player_3,row.player_4].map(plLocalId),created:row.created_at,games:[],closed:false,online:true});
+  }
+  for(const row of ms.data||[]){
+   const l=db.leagues.find(l=>l.id===row.season_id);if(!l)continue;
+   const g={id:row.id,date:row.played_at,a:plLocalId(row.player_a),b:plLocalId(row.player_b),winner:plLocalId(row.winner),kind:'league',ref:{league:row.season_id,night:row.night,stage:row.stage},sides:[row.side_a,row.side_b]};
+   db.games.push(g);l.games.push(g.id);
+  }
+  for(const l of db.leagues.filter(l=>l.online))l.closed=!!plGame(l,16,'final16')&&!!plGame(l,16,'third');
+  plLoaded=true;
+ }catch(e){plError=e.message||'Premier League konnte nicht geladen werden.';plLoaded=false;}
+ finally{plLoading=false;if(view==='league'||view==='stats')render()}
+}
+async function createPlOnline(){
+ if(plSaving)return;
+ const participants=[0,1,2,3].map(i=>document.getElementById('slot'+i)?.value);
+ if(participants.some(x=>!x)||new Set(participants).size!==4)return showAppAlert('Vier unterschiedliche Spieler auswählen.');
+ const ids=participants.map(plOnlineId);
+ if(ids.some(x=>!x))return showAppAlert('Alle vier Spieler benötigen ein Online-Konto.');
+ const title=document.getElementById('seasonName')?.value.trim()||'Premier League';
+ plSaving=true;
+ try{const {client}=await cloudUser();const {error}=await client.rpc('ruefner_pl_create_season',{p_title:title,p_players:ids});if(error)throw error;plLoaded=false;await loadPlOnline(true);go('league');}
+ catch(e){showAppAlert('Saison konnte nicht erstellt werden: '+(e.message||e));}
+ finally{plSaving=false;}
+}
+async function savePlOnline(g){
+ const {client,user}=await cloudUser();
+ const l=db.leagues.find(l=>l.id===g.ref?.league);
+ if(!l?.online)throw Error('Keine Online-Saison. Bitte Premier League neu laden.');
+ if(!l.participants.some(p=>plOnlineId(p)===user.id))throw Error('Nur Saisonspieler dürfen Resultate speichern.');
+ // RPC validates canonical player ordering; the red starter may have been the second player.
+ const pairs=g.ref.night<=15?(g.ref.stage==='semi1'||g.ref.stage==='semi2'?plPairs(l,g.ref.night)[g.ref.stage==='semi1'?0:1]:[plGame(l,g.ref.night,'semi1').winner,plGame(l,g.ref.night,'semi2').winner]):(g.ref.stage==='final16'?[leagueStandings(l)[0].pid,leagueStandings(l)[1].pid]:[leagueStandings(l)[2].pid,leagueStandings(l)[3].pid]);
+ const idx=pairs.map(pid=>g.a===pid?0:1);
+ const {error}=await client.rpc('ruefner_pl_record_match',{p_season:l.id,p_night:g.ref.night,p_stage:g.ref.stage,p_a:plOnlineId(pairs[0]),p_b:plOnlineId(pairs[1]),p_winner:plOnlineId(g.winner),p_side_a:g.sides[idx[0]],p_side_b:g.sides[idx[1]]});
+ if(error)throw error;
+ plLoaded=false;await loadPlOnline(true);
+ if(!plLoaded)throw Error('Ergebnis gespeichert, aber Aktualisierung fehlgeschlagen. Bitte PL neu öffnen.');
+}
+function refreshPlOnline(){plLoaded=false;loadPlOnline(true)}
 function cloudId(localId){
  const p=player(localId);
  return p?.onlineId||null;
@@ -355,7 +415,10 @@ function cancelFirstThrow(){const kind=pendingStart?.kind;pendingStart=null;go(k
 function chooseFirstThrow(side){
  if(!pendingStart||![0,1].includes(side))return;
  const {a,b,kind,ref,difficulty}=pendingStart;pendingStart=null;
- beginMatch(a,b,kind,ref,difficulty,side);
+ if(kind==='league'){
+  const first=side===0?a:b,second=side===0?b:a;
+  beginMatch(first,second,kind,ref,difficulty,0);
+ }else beginMatch(a,b,kind,ref,difficulty,side);
 }
 function beginMatch(a,b,kind,ref,difficulty,firstTurn){
  match={id:id(),a,b,kind,ref,difficulty,sides:[newSide(),newSide()],turn:firstTurn,round:[],pending:null,bonus:false,comboActive:false,comboBonusThrows:0,tricks:0,bonusPhase:false,bonusType:null,awaitingTrick:false,finished:false,log:[],undo:[]};
@@ -469,7 +532,7 @@ function game(){
  const a=match.a,b=match.b,owner=match.turn;
  const notice=match.islandChoice?(match.islandChoice.kind==='hit'?'🏝️ Island getroffen! Gegner wählt einen zusätzlichen Becher.':'🏝️ Island verfehlt! Wähle einen eigenen Becher zum Entfernen.'):ui.islandActive?'🏝️ Island angesagt! Alleinstehenden Becher treffen oder auf den Tisch tippen.':ui.ownGoal?`⚽ Eigentor von ${esc(name([match.a,match.b][match.turn]))}: Tippe einen eigenen Becher an.`:match.pending?'💣 Bombe! Wähle die markierten Becher.':match.finished?'🏆 Spiel beendet.':match.awaitingTrick?'🎩 Wähle einen Trickshot für Rüfner 3000.':match.bonusPhase?`🎩 Trickshot: ${match.bonusType==null?'Frei wählbar':esc(trickNames[match.bonusType])} · jetzt ausführen!${trickCount()?' · danach noch ein Trickshot':''}`:`🎯 ${esc(name([a,b][owner]))} ist dran · Wurf ${match.round.length+1} von 2${trickCount()?' · '+trickCount()+' Trickshot(s) vorgemerkt':''}`;
  const controls=`<div class="game-actions">${btn('↶','undoShot()','secondary action-icon undo-icon')}${canRerack()?btn('🔄','showRerack()','secondary action-icon'):''}${!match.finished&&isHumanTurn()&&!match.pending&&!match.bonusPhase&&!match.awaitingTrick&&match.round.length<2?btn('🎩','requestTrick()','secondary action-icon'):''}${ui.ownGoal?btn('✕','cancelOwnGoal()','secondary action-icon own-goal-cancel'):''}${!ui.ownGoal&&!match.finished&&match.kind!=='training'&&!match.pending&&!match.islandChoice?btn('💀','deathCup()','secondary action-icon')+btn('⚽','ownGoal()','secondary action-icon'):''}${!match.finished&&!match.pending&&!match.islandChoice&&!isComTurn()&&(ui.islandActive||canIsland())?`<button class="btn secondary action-icon island-action ${ui.islandActive?'island-on':''}" onclick="toggleIsland()" aria-label="Island ansagen">🏝️</button>`:''}</div>`;
- return `<div class="game-screen">${(match.pending||match.islandChoice||ui.islandActive||match.bonusPhase||match.awaitingTrick||ui.ownGoal)?`<div class="fullscreen-status" aria-live="polite">${notice}</div>`:''}<div class="table-with-actions"><div class="matchstack" onclick="boardTableMiss(event)"><div class="table-side-label player-top ${owner===1?'is-active':''}">${avatar(b)}<div class="player-label"><span class="player-status"><strong>${esc(name(b))}</strong>${owner===1?`<span class="throw-count"> · Wurf ${Math.min(match.round.length+1,2)} von 2</span>`:''}</span></div></div>${cupBoard(1)}<div class="table-middle-line"></div>${cupBoard(0)}<div class="table-side-label player-bottom ${owner===0?'is-active':''}">${avatar(a)}<div class="player-label"><span class="player-status"><strong>${esc(name(a))}</strong>${owner===0?`<span class="throw-count"> · Wurf ${Math.min(match.round.length+1,2)} von 2</span>`:''}</span></div></div>${controls}<button class="game-exit" onclick="cancelMatch()" aria-label="Spiel abbrechen">✕</button></div></div>${ui.rerack?rerackPanel():''}${ui.trickFlash&&Date.now()<ui.trickFlash.until?`<div class="trick-flash" role="status" aria-live="polite" onclick="dismissTrickFlash();event.stopPropagation()"><div class="trick-flash-inner"><div class="trick-flash-title">🎩 TRICKSHOT!</div><div class="trick-flash-task">${esc(ui.trickFlash.label)}</div></div></div>`:''}${match.awaitingTrick?`<div class="trick-choice-backdrop" role="dialog" aria-modal="true" aria-label="Trickshot für COM wählen"><div class="trick-choice-modal"><div class="trick-choice-title">🎩 RÜFNER 3000 TRICKSHOT!</div><p>Welchen Trickshot muss der COM machen?</p><div class="trick-choice-grid">${trickNames.map((t,i)=>`<button class="btn secondary" onclick="chooseComTrick(${i})">${esc(t)}</button>`).join('')}</div></div></div>`:''}${ui.deathCup&&!match.finished?`<div class="trick-choice-backdrop" role="dialog" aria-modal="true" aria-label="Death Cup Sieger wählen"><div class="trick-choice-modal"><div class="trick-choice-title">💀 DEATH CUP!</div><p>Wer ist der Sieger?</p><div class="trick-choice-grid">${btn('🔵 '+esc(name(match.a)),'chooseDeathCupWinner(0)')}${btn('🔴 '+esc(name(match.b)),'chooseDeathCupWinner(1)')}</div><p>${btn('Abbrechen','cancelDeathCup()','secondary')}</p></div></div>`:''}${match.finished?`<div class="victory-overlay" role="dialog" aria-modal="true" aria-label="Spiel beendet"><div class="victory-card"><div class="victory-trophy">🏆</div><h2>${esc(name(match.winner))} gewinnt!</h2>${match.kind==='training'?'':'<p>Was möchtest du mit dem Ergebnis machen?</p>'}<div class="victory-buttons">${match.kind==='training'?btn('🏠 Zurück zum Menü','finishMatch()'):btn(cloudSaving?'Speichert online …':'💾 Ergebnis speichern','finishMatch()',cloudSaving?'secondary':'')+btn('Nicht speichern','discardFinishedMatch()','secondary')}${btn('↶ Letzten Wurf rückgängig','undoShot()','secondary')}</div></div></div>`:''}<div class="panel match-stats"><div class="row between"><span class="muted">${esc(name(a))}: ${match.sides[0].hits}/${match.sides[0].shots} Treffer · ${match.sides[0].bombs} Bomben</span><span class="muted">${esc(name(b))}: ${match.sides[1].hits}/${match.sides[1].shots} Treffer · ${match.sides[1].bombs} Bomben</span></div></div></div>`;
+ return `<div class="game-screen">${(match.pending||match.islandChoice||ui.islandActive||match.bonusPhase||match.awaitingTrick||ui.ownGoal)?`<div class="fullscreen-status" aria-live="polite">${notice}</div>`:''}<div class="table-with-actions"><div class="matchstack" onclick="boardTableMiss(event)"><div class="table-side-label player-top ${owner===1?'is-active':''}">${avatar(b)}<div class="player-label"><span class="player-status"><strong>${esc(name(b))}</strong>${owner===1?`<span class="throw-count"> · Wurf ${Math.min(match.round.length+1,2)} von 2</span>`:''}</span></div></div>${cupBoard(1)}<div class="table-middle-line"></div>${cupBoard(0)}<div class="table-side-label player-bottom ${owner===0?'is-active':''}">${avatar(a)}<div class="player-label"><span class="player-status"><strong>${esc(name(a))}</strong>${owner===0?`<span class="throw-count"> · Wurf ${Math.min(match.round.length+1,2)} von 2</span>`:''}</span></div></div>${controls}<button class="game-exit" onclick="cancelMatch()" aria-label="Spiel abbrechen">✕</button></div></div>${ui.rerack?rerackPanel():''}${ui.trickFlash&&Date.now()<ui.trickFlash.until?`<div class="trick-flash" role="status" aria-live="polite" onclick="dismissTrickFlash();event.stopPropagation()"><div class="trick-flash-inner"><div class="trick-flash-title">🎩 TRICKSHOT!</div><div class="trick-flash-task">${esc(ui.trickFlash.label)}</div></div></div>`:''}${match.awaitingTrick?`<div class="trick-choice-backdrop" role="dialog" aria-modal="true" aria-label="Trickshot für COM wählen"><div class="trick-choice-modal"><div class="trick-choice-title">🎩 RÜFNER 3000 TRICKSHOT!</div><p>Welchen Trickshot muss der COM machen?</p><div class="trick-choice-grid">${trickNames.map((t,i)=>`<button class="btn secondary" onclick="chooseComTrick(${i})">${esc(t)}</button>`).join('')}</div></div></div>`:''}${ui.deathCup&&!match.finished?`<div class="trick-choice-backdrop" role="dialog" aria-modal="true" aria-label="Death Cup Sieger wählen"><div class="trick-choice-modal"><div class="trick-choice-title">💀 DEATH CUP!</div><p>Wer ist der Sieger?</p><div class="trick-choice-grid">${btn('🔵 '+esc(name(match.a)),'chooseDeathCupWinner(0)')}${btn('🔴 '+esc(name(match.b)),'chooseDeathCupWinner(1)')}</div><p>${btn('Abbrechen','cancelDeathCup()','secondary')}</p></div></div>`:''}${match.finished?`<div class="victory-overlay" role="dialog" aria-modal="true" aria-label="Spiel beendet"><div class="victory-card"><div class="victory-trophy">🏆</div><h2>${esc(name(match.winner))} gewinnt!</h2>${match.kind==='training'?'':'<p>Was möchtest du mit dem Ergebnis machen?</p>'}<div class="victory-buttons">${match.kind==='training'?btn('🏠 Zurück zum Menü','finishMatch()'):btn(match.kind==='league'?'🏆 Ergebnis abschliessen':cloudSaving?'Speichert online …':'💾 Ergebnis speichern','finishMatch()',cloudSaving?'secondary':'')+(match.kind==='league'?'':btn('Nicht speichern','discardFinishedMatch()','secondary'))}${btn('↶ Letzten Wurf rückgängig','undoShot()','secondary')}</div></div></div>`:''}<div class="panel match-stats"><div class="row between"><span class="muted">${esc(name(a))}: ${match.sides[0].hits}/${match.sides[0].shots} Treffer · ${match.sides[0].bombs} Bomben</span><span class="muted">${esc(name(b))}: ${match.sides[1].hits}/${match.sides[1].shots} Treffer · ${match.sides[1].bombs} Bomben</span></div></div></div>`;
 }
 function snapshot(){match.undo.push(JSON.stringify({...match,undo:[]}));if(match.undo.length>30)match.undo.shift()}
 function undoShot(){if(!match?.undo.length)return;const old=match.undo.pop(),remaining=match.undo;match=JSON.parse(old);match.undo=remaining;ui.rerack=false;ui.islandActive=false;render()}
@@ -596,15 +659,15 @@ function computerTurn(){
  if(match.round.length===2)resolveRound();else{render();setTimeout(computerTurn,550)}
 }
 function canComRerack(){if(!match||match.kind!=='training'||match.turn!==1||match.finished||match.pending||match.round.length||match.comboActive||match.comboBonusThrows>0||match.bonusPhase||match.awaitingTrick)return false;const s=match.sides[0];return !s.reracked&&s.cups.length>=2&&s.cups.length<=6}
-function canRerack(){if(!match||match.finished||match.pending||match.islandChoice||ui.islandActive||match.round.length!==0||match.comboActive||match.comboBonusThrows>0||match.bonusPhase||match.awaitingTrick||isComTurn())return false;const s=match.sides[boardIndex()];return !s.reracked&&s.cups.length>=2&&s.cups.length<=6}
-function showRerack(){if(!canRerack())return;ui.rerack=true;render()}
+function canRerack(){if(match?.kind==='league')return false;if(!match||match.finished||match.pending||match.islandChoice||ui.islandActive||match.round.length!==0||match.comboActive||match.comboBonusThrows>0||match.bonusPhase||match.awaitingTrick||isComTurn())return false;const s=match.sides[boardIndex()];return !s.reracked&&s.cups.length>=2&&s.cups.length<=6}
+function showRerack(){if(match?.kind==='league'||!canRerack())return;ui.rerack=true;render()}
 function formationPreview(n,v,side){
  const coords=formationCoords(n,v);
  return `<svg viewBox="0 0 190 130" aria-hidden="true">${coords.map(q=>`<circle cx="${95+(q.x-145)*.8}" cy="${side===1?130-(13+(q.y-(206-3*46))*.68):13+(q.y-(206-3*46))*.68}" r="15" fill="${side===1?'#d64b52':'#377fe5'}" stroke="#f6f7fb" stroke-width="3"/>`).join('')}</svg>`;
 }
 function rerackPanel(){const side=boardIndex(),n=match.sides[side].cups.length;return `<div class="rerack-backdrop" onclick="if(event.target===this)closeRerack()"><div class="panel rerack-panel" role="dialog" aria-modal="true" aria-label="Formation auswählen"><h3>🔄 Formation auswählen</h3><div class="formation-grid">${(variantNames[n]||[]).map((_,i)=>`<button class="formation-choice" onclick="applyRerack(${side},${i},true)" aria-label="Formation ${i+1}">${formationPreview(n,i,side)}</button>`).join('')}</div>${btn('Abbrechen','closeRerack()','secondary')}</div></div>`}
 function closeRerack(){ui.rerack=false;render()}
-function applyRerack(side,v,redraw=true){if(!match||side!==boardIndex())return;const s=match.sides[side],n=s.cups.length;if(s.reracked||n<2||n>6||match.round.length||(isComTurn()? !canComRerack():!canRerack()))return;const positions=formationCoords(n,v);s.positions={};s.cups.forEach((c,i)=>s.positions[c]=positions[i]);s.reracked=true;ui.rerack=false;if(redraw)render()}
+function applyRerack(side,v,redraw=true){if(match?.kind==='league')return;if(!match||side!==boardIndex())return;const s=match.sides[side],n=s.cups.length;if(s.reracked||n<2||n>6||match.round.length||(isComTurn()? !canComRerack():!canRerack()))return;const positions=formationCoords(n,v);s.positions={};s.cups.forEach((c,i)=>s.positions[c]=positions[i]);s.reracked=true;ui.rerack=false;if(redraw)render()}
 function deathCup(){if(!match||match.kind==='training'||match.finished||match.pending)return;ui.deathCup=true;render()}
 function cancelDeathCup(){ui.deathCup=false;render()}
 function chooseDeathCupWinner(side){
@@ -618,13 +681,20 @@ function discardFinishedMatch(){if(!match?.finished)return;match=null;go('home')
 function cancelMatch(){if(!match)return go('home');showAppConfirm('Spiel wirklich verlassen? Nicht gespeicherte Daten gehen verloren.',()=>{match=null;go('home')})}
 async function finishMatch(){
  if(!match?.finished||cloudSaving)return;
+ if(match.kind==='league'){
+  const l=db.leagues.find(x=>x.id===match.ref?.league);
+  if(!l||plCurrentNight(l)!==match.ref.night||plGame(l,match.ref.night,match.ref.stage)){
+   showAppAlert('Diese Begegnung wurde bereits abgeschlossen oder ist gesperrt.');return;
+  }
+ }
  const g={id:match.id,date:new Date().toISOString(),a:match.a,b:match.b,winner:match.winner,kind:match.kind,ref:match.ref,sides:match.sides.map((s,i)=>({remaining:s.cups.length,shots:s.shots,hits:s.hits,bombs:s.bombs,combos:s.combos,turns:s.turns-(match.halfTurnWinner===i?.5:0),trickAttempts:s.trickAttempts,trickHits:s.trickHits,islandAttempts:s.islandAttempts,islandHits:s.islandHits,finishAttempts:s.finishAttempts,finishHits:s.finishHits,normalFinishes:s.normalFinishes,comboFinishes:s.comboFinishes,bombFinishes:s.bombFinishes}))};
- if(g.kind==='friendly'){
+ if(g.kind==='friendly'||g.kind==='league'){
   cloudSaving=true;render();
-  try{await saveFriendlyOnline(g);}
+  try{if(g.kind==='league')await savePlOnline(g);else await saveFriendlyOnline(g);}
   catch(e){cloudSaving=false;render();showAppAlert('Online-Speichern fehlgeschlagen: '+(e.message||'Unbekannter Fehler')+'\nDas Spiel ist noch offen. Bitte erneut versuchen.');return;}
   cloudSaving=false;
  }
+ if(g.kind==='league'){match=null;go('league');return;}
  if(g.kind==='training'){
   if(match.winner===match.a)db.record[match.a]=Math.max(db.record[match.a]??-1,match.difficulty);
  }else{
@@ -633,33 +703,83 @@ async function finishMatch(){
    const l=db.leagues.find(l=>l.id===match.ref.league);
    if(l){
     if(!l.games.includes(g.id))l.games.push(g.id);
-    if(match.ref.stage==='final16'&&l.games.filter(i=>db.games.find(g=>g.id===i)?.ref?.stage==='final16').length===2)l.closed=true;
+    if(match.ref.night===16&&plGame(l,16,'final16')&&plGame(l,16,'third'))l.closed=true;
    }
   }
  }
  save();match=null;go(g.kind==='training'?'home':g.kind==='league'?'league':'stats');
 }
-function league(){const l=activeLeague();return `<div class="section row between"><h2>🏆 Premier League</h2>${isAdmin()?btn('Neue Saison','createLeagueForm()','secondary'):''}</div>${!l?`<div class="panel"><h3>Keine aktive Saison</h3><p class="muted">15 reguläre Nights, danach das grosse Finale.</p>${isAdmin()?btn('Saison erstellen','createLeagueForm()'):''}</div>`:leagueDetail(l)}<div class="section"><h2>📚 Saisonarchiv</h2></div>${db.leagues.filter(x=>x.closed).map(x=>`<div class="panel"><div class="row between"><strong>${esc(x.title)}</strong>${btn('Ansehen',`showArchived('${x.id}')`,'secondary')}</div></div>`).join('')||'<p class="muted">Noch keine abgeschlossenen Saisons.</p>'}`}
-function createLeagueForm(){if(!isAdmin())return showAppAlert('Nur der Host darf eine Saison erstellen.');if(activeLeague())return showAppAlert('Zuerst die aktive Saison abschliessen.');ui.create=true;renderLeagueForm()}
-function renderLeagueForm(){const ps=db.players.filter(p=>p.id!==db.current&&!p.isDeleted);document.getElementById('app').innerHTML=`<div class="shell">${header()}<div class="panel"><h2>🏆 Neue Premier League</h2><div class="field"><label>Saisonname</label><input id="seasonName" value="Premier League ${new Date().getFullYear()}"></div><p>Host: ${esc(name(db.current))}</p>${[1,2,3].map(i=>`<div class="field"><label>Mitspieler ${i}</label><select id="inv${i}">${ps.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('')}</select></div>`).join('')}${btn('Saison starten','createLeague()')} ${btn('Abbrechen',"go('league')",'secondary')}</div></div>`}
-function createLeague(){if(!isAdmin())return;const participants=[db.current,...[1,2,3].map(i=>document.getElementById('inv'+i).value)];if(new Set(participants).size!==4)return showAppAlert('Bitte drei unterschiedliche Freunde auswählen.');if(participants.some(pid=>!player(pid)||player(pid).isDeleted))return showAppAlert('Gelöschte Spieler dürfen nicht an einer neuen Liga teilnehmen.');const title=document.getElementById('seasonName').value.trim()||'Premier League';db.leagues.push({id:id(),title,participants,created:new Date().toISOString(),games:[],closed:false});save();go('league')}
+function league(){if(!plLoaded&&!plLoading&&!plError)setTimeout(()=>loadPlOnline(),0);const l=db.leagues.filter(x=>x.online).find(x=>!x.closed);return `<div class="panel"><p class="muted">${plLoading?'Premier League wird geladen …':plError?'Online-Fehler: '+esc(plError):'Online-Saison · für alle registrierten Spieler sichtbar'}</p>${btn('↻ Aktualisieren','refreshPlOnline()','secondary')}</div>`+ `<div class="section row between"><h2>🏆 Premier League</h2></div>${!l?`<div class="panel"><h3>Keine aktive Saison</h3><p class="muted">15 Nights und Finalabend.</p>${onlineNavRole==='admin'?btn('Saison erstellen','createLeagueForm()'):''}</div>`:leagueDetail(l)}<div class="section"><h2>Saisonarchiv</h2></div>${db.leagues.filter(x=>x.online&&x.closed).map(x=>`<div class="panel"><strong>${esc(x.title)}</strong> ${btn('Ansehen',`showArchived('${x.id}')`,'secondary')}</div>`).join('')||'<p class="muted">Noch keine abgeschlossenen Saisons.</p>'}`}
+function createLeagueForm(){if(onlineNavRole!=='admin')return showAppAlert('Nur der Administrator kann eine Saison erstellen.');if(db.leagues.some(l=>l.online&&!l.closed))return showAppAlert('Es läuft bereits eine Saison.');renderLeagueForm()}
+function renderLeagueForm(){
+ const ps=db.players.filter(p=>p.onlineId&&!p.isDeleted);
+ const choices=ps.map(p=>`<option value="${esc(p.id)}">${esc(p.name)}</option>`).join('');
+ document.getElementById('app').innerHTML=`<div class="shell">${header()}<div class="panel"><h2>Neue Premier League</h2><div class="field"><label>Saisonname</label><input id="seasonName" value="Premier League ${new Date().getFullYear()}"></div>${[0,1,2,3].map(i=>`<div class="field"><label>Spieler ${i+1}</label><select id="slot${i}"><option value="">Bitte wählen</option>${choices}</select></div>`).join('')}${btn('Saison starten','createPlOnline()')} ${btn('Abbrechen',"go('league')",'secondary')}</div></div>`;
+}
+function createLeague(){
+ if(!isAdmin()||activeLeague())return;
+ const participants=[0,1,2,3].map(i=>document.getElementById('slot'+i)?.value);
+ if(participants.some(x=>!x)||new Set(participants).size!==4)return showAppAlert('Vier verschiedene registrierte Spieler auswählen.');
+ if(participants.some(pid=>!player(pid)||player(pid).isDeleted))return showAppAlert('Ungültiger Spieler.');
+ const title=document.getElementById('seasonName').value.trim()||'Premier League';
+ db.leagues.push({id:id(),title,participants,created:new Date().toISOString(),games:[],closed:false});save();go('league');
+}
+const PL_PAIRS=[[[0,1],[2,3]],[[0,2],[1,3]],[[0,3],[1,2]]];
+function plPairs(l,n){return PL_PAIRS[(n-1)%3].map(pair=>pair.map(i=>l.participants[i]));}
+function plGame(l,n,stage){return nightGames(l,n).find(g=>g.ref?.stage===stage)}
+function plCurrentNight(l){for(let n=1;n<=15;n++)if(!nightResult(l,n))return n;return 16;}
+function plResultLine(g){const w=g.winner===g.a?0:1,loser=1-w;return `<span class="badge">🔒 ${esc(name(g.winner))} ${g.sides[w].remaining}:0 ${esc(name(loser===0?g.a:g.b))}</span>`;}
+function startPlGame(lid,n,stage,a,b){
+ const l=db.leagues.find(x=>x.id===lid);
+ if(!l||!l.online||l.closed||plCurrentNight(l)!==n||plGame(l,n,stage))return showAppAlert('Diese Begegnung ist gesperrt.');
+ if(!onlineUserId||!l.participants.some(p=>plOnlineId(p)===onlineUserId))return showAppAlert('Nur Saisonspieler dürfen PL-Begegnungen spielen.');
+ if(n<=15){
+  const pairs=plPairs(l,n);
+  if(stage==='semi1'||stage==='semi2'){
+   const expected=pairs[stage==='semi1'?0:1];
+   if(a!==expected[0]||b!==expected[1])return;
+  }else if(stage==='final'){
+   const x=plGame(l,n,'semi1'),y=plGame(l,n,'semi2');
+   if(!x||!y||a!==x.winner||b!==y.winner)return;
+  }else return;
+ }else{
+  const rows=leagueStandings(l),expected=stage==='final16'?[rows[0].pid,rows[1].pid]:stage==='third'?[rows[2].pid,rows[3].pid]:[];
+  if(a!==expected[0]||b!==expected[1])return;
+  // Platz 1 bzw. 3 beginnt und spielt ROT.
+  beginMatch(a,b,'league',{league:lid,night:n,stage},0);return;
+ }
+ startMatch(a,b,'league',{league:lid,night:n,stage});
+}
 function leagueGames(l){return l.games.map(i=>db.games.find(g=>g.id===i)).filter(Boolean)}
 function nightGames(l,n){return leagueGames(l).filter(g=>g.ref?.night===n)}
 function nightResult(l,n){const gs=nightGames(l,n),final=gs.find(g=>g.ref.stage==='final');return final?{winner:final.winner,runner:final.a===final.winner?final.b:final.a}:null}
 function leagueStandings(l){const ps=l.participants.map(pid=>({pid,points:0,nights:0,diff:0,bombs:0,wins:0,losses:0,shots:0,hits:0}));for(let n=1;n<=15;n++){const result=nightResult(l,n);if(result){ps.find(x=>x.pid===result.winner).points+=5;ps.find(x=>x.pid===result.winner).nights++;ps.find(x=>x.pid===result.runner).points+=2}}for(const g of leagueGames(l)){for(let i=0;i<2;i++){const pid=i===0?g.a:g.b,x=ps.find(p=>p.pid===pid);if(!x)continue;const side=g.sides[i],opp=g.sides[1-i];x.diff+=side.remaining-opp.remaining;x.bombs+=side.bombs;x.shots+=side.shots;x.hits+=side.hits;if(g.winner===pid)x.wins++;else x.losses++}}return ps.sort((a,b)=>b.points-a.points||b.nights-a.nights||b.diff-a.diff||b.bombs-a.bombs)}
-function leagueDetail(l){const standings=leagueStandings(l);const completed=Array.from({length:15},(_,i)=>nightResult(l,i+1)).filter(Boolean).length;const next=completed+1;const done=nightGames(l,Math.min(next,16));return `<div class="hero"><div class="eyebrow">Saison ${esc(l.title)}</div><h1>${l.closed?'Saison abgeschlossen 👑':`Night ${next<=15?next:'16 · Finalabend'}`}</h1><p>${esc(l.participants.map(name).join(' · '))}</p></div><div class="panel"><h3>Rangliste · reguläre Saison</h3>${standingsTable(standings)}</div>${!l.closed?`<div class="panel"><h3>${next<=15?`Night ${next} · Halbfinals & Finale`:'Night 16 · Finalabend'}</h3>${next<=15?regularNight(l,next):finalNight(l)}</div>`:`<div class="panel"><h3>👑 Champion: ${esc(name(champion(l)))}</h3></div>`}<div class="panel"><h3>📊 Liga-Spielerstatistik</h3><div class="table-wrap"><table class="table"><thead><tr><th>Spieler</th><th>Spiele</th><th>Siege</th><th>Trefferquote</th><th>💣</th></tr></thead><tbody>${standings.map(x=>`<tr><td>${esc(name(x.pid))}</td><td>${x.wins+x.losses}</td><td>${x.wins}</td><td>${x.shots?(100*x.hits/x.shots).toFixed(1)+' %':'–'}</td><td>${x.bombs}</td></tr>`).join('')}</tbody></table></div></div><div class="panel"><h3>Alle Spielabende</h3>${Array.from({length:16},(_,i)=>{const gs=nightGames(l,i+1);return gs.length?`<details><summary>${i===15?'Finalabend':`Night ${i+1}`} · ${gs.length} Spiele</summary>${gs.map(g=>`<p>${esc(name(g.a))} ${g.sides[0].remaining} : ${g.sides[1].remaining} ${esc(name(g.b))} · Sieger: ${esc(name(g.winner))}</p>`).join('')}</details>`:''}).join('')||'<p class="muted">Noch keine Spiele erfasst.</p>'}</div>`}
+function leagueDetail(l){const standings=leagueStandings(l);const next=plCurrentNight(l);const done=nightGames(l,Math.min(next,16));return `<div class="hero"><div class="eyebrow">Saison ${esc(l.title)}</div><h1>${l.closed?'Saison abgeschlossen 👑':`Night ${next<=15?next:'16 · Finalabend'}`}</h1><p>${esc(l.participants.map(name).join(' · '))}</p></div><div class="panel"><h3>Rangliste · reguläre Saison</h3>${standingsTable(standings)}</div>${!l.closed?`<div class="panel"><h3>${next<=15?`Night ${next} · Halbfinals & Finale`:'Night 16 · Finalabend'}</h3>${next<=15?regularNight(l,next):finalNight(l)}</div>`:`<div class="panel"><h3>👑 Champion: ${esc(name(champion(l)))}</h3></div>`}<div class="panel"><h3>📊 Liga-Spielerstatistik</h3><div class="table-wrap"><table class="table"><thead><tr><th>Spieler</th><th>Spiele</th><th>Siege</th><th>Trefferquote</th><th>💣</th></tr></thead><tbody>${standings.map(x=>`<tr><td>${esc(name(x.pid))}</td><td>${x.wins+x.losses}</td><td>${x.wins}</td><td>${x.shots?(100*x.hits/x.shots).toFixed(1)+' %':'–'}</td><td>${x.bombs}</td></tr>`).join('')}</tbody></table></div></div><div class="panel"><h3>Alle Spielabende</h3>${Array.from({length:16},(_,i)=>{const gs=nightGames(l,i+1);return gs.length?`<details><summary>${i===15?'Finalabend':`Night ${i+1}`} · ${gs.length} Spiele</summary>${gs.map(g=>`<p>${esc(name(g.a))} ${g.sides[0].remaining} : ${g.sides[1].remaining} ${esc(name(g.b))} · Sieger: ${esc(name(g.winner))}</p>`).join('')}</details>`:''}).join('')||'<p class="muted">Noch keine Spiele erfasst.</p>'}</div>`}
 function standingsTable(rows){return `<div class="table-wrap"><table class="table"><thead><tr><th>#</th><th>Spieler</th><th>Pkt.</th><th>Nights</th><th>+/-</th><th>💣</th></tr></thead><tbody>${rows.map((x,i)=>`<tr><td>${i+1}</td><td>${esc(name(x.pid))}</td><td><strong>${x.points}</strong></td><td>${x.nights}</td><td>${x.diff>0?'+':''}${x.diff}</td><td>${x.bombs}</td></tr>`).join('')}</tbody></table></div>`}
-function regularNight(l,n){const gs=nightGames(l,n),semi=gs.filter(g=>g.ref.stage==='semi'),fin=gs.find(g=>g.ref.stage==='final');let html=gs.map(g=>`<p>✓ ${esc(name(g.a))} gegen ${esc(name(g.b))} · Sieger: <strong>${esc(name(g.winner))}</strong></p>`).join('');if(semi.length<2){const used=semi.flatMap(g=>[g.a,g.b]),avail=l.participants.filter(p=>!used.includes(p));html+=`<p class="muted">Halbfinale ${semi.length+1}</p>${isAdmin()?`<div class="row"><select id="semiA" class="select">${avail.map(p=>`<option value="${p}">${esc(name(p))}</option>`).join('')}</select><select id="semiB">${avail.map((p,i)=>`<option value="${p}" ${i===1?'selected':''}>${esc(name(p))}</option>`).join('')}</select>${btn('Match starten',`startLeagueSemi('${l.id}',${n})`)}</div>`:'<p>Host startet das Match.</p>'}`}else if(!fin){const winners=semi.map(g=>g.winner);html+=`<p>Finale: <strong>${esc(name(winners[0]))} – ${esc(name(winners[1]))}</strong></p>${isAdmin()?btn('Finale starten',`startMatch('${winners[0]}','${winners[1]}','league',{league:'${l.id}',night:${n},stage:'final'})`):''}`}else html+='<p class="badge">✓ Night abgeschlossen</p>';return html}
-function startLeagueSemi(lid,n){const a=document.getElementById('semiA').value,b=document.getElementById('semiB').value;if(a===b)return showAppAlert('Bitte zwei verschiedene Spieler auswählen.');startMatch(a,b,'league',{league:lid,night:n,stage:'semi'})}
-function finalNight(l){const rows=leagueStandings(l),gs=nightGames(l,16);return [['third',rows[2].pid,rows[3].pid,'Spiel um Platz 3'],['final16',rows[0].pid,rows[1].pid,'Grand Final']].map(([stage,a,b,label])=>{const g=gs.find(g=>g.ref.stage===stage);return `<div class="panel"><h3>${label}</h3><p>${esc(name(a))} ⚔️ ${esc(name(b))}</p>${g?`<span class="badge">Sieger: ${esc(name(g.winner))}</span>`:isAdmin()?btn('Match starten',`startMatch('${a}','${b}','league',{league:'${l.id}',night:16,stage:'${stage}'})`):''}</div>`}).join('')}
+function regularNight(l,n){
+ const pairs=plPairs(l,n);
+ const semi=pairs.map((pair,i)=>{
+  const stage='semi'+(i+1),g=plGame(l,n,stage);
+  return `<div class="panel"><strong>Halbfinale ${i+1}</strong><p>${esc(name(pair[0]))} – ${esc(name(pair[1]))}</p>${g?plResultLine(g):btn('Spielen',`startPlGame('${l.id}',${n},'${stage}','${pair[0]}','${pair[1]}')`)}</div>`;
+ }).join('');
+ const a=plGame(l,n,'semi1'),b=plGame(l,n,'semi2'),fin=plGame(l,n,'final');
+ return semi+`<div class="panel"><strong>Finale</strong><p>${a&&b?esc(name(a.winner))+' – '+esc(name(b.winner)):'Wartet auf beide Halbfinals'}</p>${fin?plResultLine(fin):a&&b?btn('Finale spielen',`startPlGame('${l.id}',${n},'final','${a.winner}','${b.winner}')`):'<span class="muted">Gesperrt</span>'}</div>`;
+}
+function finalNight(l){
+ const rows=leagueStandings(l);
+ return [['third',rows[2].pid,rows[3].pid,'Kleines Finale'],['final16',rows[0].pid,rows[1].pid,'Grosses Finale']].map(([stage,a,b,label])=>{
+  const g=plGame(l,16,stage);
+  return `<div class="panel"><h3>${label}</h3><p>${esc(name(a))} – ${esc(name(b))}</p>${g?plResultLine(g):btn('Spielen',`startPlGame('${l.id}',16,'${stage}','${a}','${b}')`)}</div>`;
+ }).join('');
+}
 function champion(l){return leagueGames(l).find(g=>g.ref?.stage==='final16')?.winner}
 function showArchived(i){const l=db.leagues.find(x=>x.id===i);if(!l)return;ui.archive=i;document.getElementById('app').innerHTML=`<div class="shell">${header()}${btn('← Zurück',"go('league')",'secondary')}${leagueDetail(l)}</div>`}
 function historyPage(){return `<h2>Spiele</h2>${db.games.map(g=>`<div class="panel">${esc(name(g.a))} gegen ${esc(name(g.b))} · ${esc(name(g.winner))} gewinnt</div>`).join('')}`}
 // Die lokale PL-Statistik bleibt sichtbar; lokale Freundschaftsspiele nicht.
 function leagueStatsOverview(){
- const leagues=db.leagues;
+ if(!plLoaded&&!plLoading&&!plError)setTimeout(()=>loadPlOnline(),0);const leagues=db.leagues.filter(l=>l.online);
  if(!leagues.length)return `<div class="section"><h2>🏆 Premier-League-Statistik</h2></div><div class="panel"><p class="muted">Noch keine Premier-League-Saison vorhanden.</p></div>`;
- return `<div class="section"><h2>🏆 Premier-League-Statistik</h2><p class="muted">Lokale Ligen · inklusive Saisonarchiv</p></div>`+leagues.map(l=>{
+ return `<div class="section"><h2>🏆 Premier-League-Statistik</h2><p class="muted">Online-Ligen · inklusive Saisonarchiv</p></div>`+leagues.map(l=>{
   const standings=leagueStandings(l).filter(x=>!player(x.pid)?.isDeleted);
   return `<div class="panel"><h3>${esc(l.title)} ${l.closed?'· Abgeschlossen':'· Aktiv'}</h3>${standingsTable(standings)}<div class="row">${btn('Zur Premier League',"go('league')",'secondary')}</div></div>`;
  }).join('');
