@@ -271,13 +271,13 @@ function playerStats(){
  if(!p||p.isDeleted)return `<div class="notice">Spieler nicht gefunden.</div>${btn('← Zurück',"go('stats')")}`;
  const gs=cloudResults.filter(g=>inStatsPeriod(g.played_at)&&(g.player_a===pid||g.player_b===pid));
   const allGs=cloudResults.filter(g=>g.player_a===pid||g.player_b===pid);
- let shots=0,hits=0,trickAttempts=0,trickHits=0,finishAttempts=0,finishHits=0,normalFinishes=0,comboFinishes=0,bombFinishes=0,bombs=0,combos=0,turns=0,cups=0;
+ let shots=0,hits=0,trickAttempts=0,trickHits=0,islandAttempts=0,islandHits=0,finishAttempts=0,finishHits=0,normalFinishes=0,comboFinishes=0,bombFinishes=0,bombs=0,combos=0,turns=0,cups=0;
  let bestWin=null,bestLoss=null,complete=0;
  for(const g of allGs){
    const isA=g.player_a===pid,s=isA?g.side_a:g.side_b,opp=isA?g.side_b:g.side_a;
    const inPeriod=inStatsPeriod(g.played_at);
    if(inPeriod){shots+=Number(s?.shots)||0;hits+=Number(s?.hits)||0;}
-   if(inPeriod){bombs+=Number(s?.bombs)||0;combos+=Number(s?.combos)||0;}
+   if(inPeriod){bombs+=Number(s?.bombs)||0;combos+=Number(s?.combos)||0;islandAttempts+=Number(s?.islandAttempts)||0;islandHits+=Number(s?.islandHits)||0;}
    const fields=['trickAttempts','trickHits','finishAttempts','finishHits','normalFinishes','comboFinishes','bombFinishes'];
    if(inPeriod)for(const k of fields)if(s?.[k]!=null&&Number.isFinite(Number(s[k])))evalStat(k,Number(s[k]));
   function evalStat(k,v){switch(k){case 'trickAttempts':trickAttempts+=v;break;case 'trickHits':trickHits+=v;break;case 'finishAttempts':finishAttempts+=v;break;case 'finishHits':finishHits+=v;break;case 'normalFinishes':normalFinishes+=v;break;case 'comboFinishes':comboFinishes+=v;break;case 'bombFinishes':bombFinishes+=v;break;}}
@@ -300,7 +300,7 @@ function playerStats(){
  card('🏆 Average',row('Gesamt-AVG',formatAvg(cups,turns))+row('Höchster Winning-AVG',rec(bestWin))+row('Höchster Losing-AVG',rec(bestLoss)),true)+
  card('🎯 Wurfstatistik',row('Geworfene Bälle',shots)+row('Treffer',hits)+row('Trefferquote',formatPct(hits,shots))+row('Trickshot-Versuche',trickAttempts||complete?trickAttempts:'–')+row('Trickshot-Trefferquote',formatPct(trickHits,trickAttempts)))+
  card('🏁 Finishstatistik',row('Finishversuche',finishAttempts||complete?finishAttempts:'–')+row('Erfolgreiche Finishes',finishHits||complete?finishHits:'–')+row('Finishquote',formatPct(finishHits,finishAttempts))+row('Normale Finishes',normalFinishes||complete?normalFinishes:'–')+row('Kombifinishes',comboFinishes||complete?comboFinishes:'–')+row('Bombenfinishes',bombFinishes||complete?bombFinishes:'–'))+
- card('💣 Spezialstatistik',row('Bomben',bombs)+row('Kombinationen',combos)+row('Becherdifferenz',(()=>{const d=gs.reduce((v,g)=>{const a=g.player_a===pid,s=a?g.side_a:g.side_b,o=a?g.side_b:g.side_a;return v+(Number(s?.remaining)||0)-(Number(o?.remaining)||0)},0);return (d>0?'+':'')+d})()))+
+ card('💣 Spezialstatistik',row('Bomben',bombs)+row('Kombinationen',combos)+row('🏝️ Island-Versuche',islandAttempts)+row('🏝️ Island-Treffer',islandHits)+row('🏝️ Island-Trefferquote',formatPct(islandHits,islandAttempts))+row('Becherdifferenz',(()=>{const d=gs.reduce((v,g)=>{const a=g.player_a===pid,s=a?g.side_a:g.side_b,o=a?g.side_b:g.side_a;return v+(Number(s?.remaining)||0)-(Number(o?.remaining)||0)},0);return (d>0?'+':'')+d})()))+
  (complete<gs.length?`<p class="muted">Hinweis: Average und neue Detailwerte sind nur für die ${complete} Spiele ab V2.7 verfügbar. Ältere Ergebnisse bleiben erhalten.</p>`:'');
 }
 async function saveFriendlyOnline(g){
@@ -332,7 +332,7 @@ function friendship(){
 function pairPicker(ids){const ps=ids||db.players.filter(p=>!p.isDeleted).filter((p,i,arr)=>arr.findIndex(q=>q.name.toLocaleLowerCase('de')===p.name.toLocaleLowerCase('de'))===i).map(p=>p.id);return `<div class="field"><label style="color:#69baff;font-weight:800">Spieler 1</label><select id="p1">${ps.map(p=>`<option value="${p}">${esc(name(p))}</option>`).join('')}</select></div><div class="field"><label style="color:#ff788e;font-weight:800">Spieler 2</label><select id="p2">${ps.map((p,i)=>`<option value="${p}" ${i===1?'selected':''}>${esc(name(p))}</option>`).join('')}</select></div>`}
 function startTraining(){if(!requireProfile())return;startMatch(db.current,'COM','training',null,Number(document.getElementById('difficulty').value))}
 function startFriendly(){if(db.players.length<2)return showAppAlert('Erstelle zuerst mindestens zwei Profile.');const a=document.getElementById('p1').value,b=document.getElementById('p2').value;if(a===b)return showAppAlert('Bitte zwei unterschiedliche Spieler wählen.');startMatch(a,b,'friendly')}
-function newSide(){return {turns:0,finishAttempts:0,finishHits:0,normalFinishes:0,comboFinishes:0,bombFinishes:0,trickAttempts:0,trickHits:0,cups:Array.from({length:10},(_,i)=>i),layout:10,positions:formationCoords(10,0),reracked:false,shots:0,hits:0,bombs:0,combos:0}}
+function newSide(){return {turns:0,finishAttempts:0,finishHits:0,normalFinishes:0,comboFinishes:0,bombFinishes:0,trickAttempts:0,trickHits:0,islandAttempts:0,islandHits:0,cups:Array.from({length:10},(_,i)=>i),layout:10,positions:formationCoords(10,0),reracked:false,shots:0,hits:0,bombs:0,combos:0}}
 function formationCoords(n,v){
  const pattern=(formationPatterns[n]||formationPatterns[10])[v]||(formationPatterns[n]||formationPatterns[10])[0];
  const maxRow=Math.max(...pattern.map(([r])=>r));
@@ -415,6 +415,18 @@ function processIslandChoices(){
 }
 function finishRegularThrows(){
  if(match.round.length!==2)return;
+ // A bomb removes the hit cup plus three others. Every successful Island
+ // removes one more. If that covers all cups, finish without any selection.
+ const hits=match.round.filter(q=>q.cup!==undefined);
+ const islandHits=hits.filter(q=>q.island).length;
+ const target=boardIndex(),remaining=match.sides[target].cups.length;
+ if(hits.length===2&&hits[0].cup===hits[1].cup&&remaining<=4+islandHits){
+  const own=match.sides[match.turn];
+  own.bombs++;own.finishAttempts++;own.finishHits++;own.bombFinishes++;
+  removeCups(target,[...match.sides[target].cups]);
+  checkWin();
+  return;
+ }
  match.islandQueue=match.round.filter(q=>q.island).map(q=>({kind:q.miss?'miss':'hit',side:q.miss?match.turn:q.side}));
  processIslandChoices();
 }
@@ -479,17 +491,23 @@ function tapCup(side,c){
  snapshot();recordHit(side,c);
 }
 function recordHit(side,c){
- const own=match.sides[match.turn];const lastCup=match.sides[side].cups.length===1;const firstRegular=match.round.length===0&&!match.bonusPhase&&!match.comboActive&&!match.comboBonusThrows;own.shots++;own.hits++;if(lastCup){own.finishAttempts++;own.finishHits++;own.normalFinishes++;if(firstRegular)match.halfTurnWinner=match.turn;}if(match.bonusPhase){own.trickAttempts++;own.trickHits++;}
+ const own=match.sides[match.turn];const lastCup=match.sides[side].cups.length===1;const firstRegular=match.round.length===0&&!match.bonusPhase&&!match.comboActive&&!match.comboBonusThrows;own.shots++;own.hits++;if(ui.islandActive){own.islandAttempts++;own.islandHits++;}if(lastCup){own.finishAttempts++;own.finishHits++;own.normalFinishes++;if(firstRegular)match.halfTurnWinner=match.turn;}if(match.bonusPhase){own.trickAttempts++;own.trickHits++;}
  if(match.bonusPhase){removeCups(side,[c]);finishTrick();return}
  const island=!!ui.islandActive;ui.islandActive=false;
  if(match.comboBonusThrows>0)match.comboBonusThrows--;match.round.push({side,cup:c,island});
+ // With only two cups left, a successful Island on the first throw
+ // necessarily removes both cups: the hit cup and one Island bonus cup.
+ if(island&&match.round.length===1&&match.sides[side].cups.length===2){
+  own.finishAttempts++;own.finishHits++;own.normalFinishes++;
+  removeCups(side,[...match.sides[side].cups]);checkWin();return;
+ }
  if(match.sides[side].cups.length===1){removeCups(side,[c]);checkWin();return}
  if(match.round.length<2){render();return}
  finishRegularThrows();
 }
 function missShot(){
  if(!match||match.finished||match.pending||match.islandChoice||isComTurn()||match.awaitingTrick)return;
- snapshot();match.sides[match.turn].shots++;if(match.sides[boardIndex()].cups.length===1)match.sides[match.turn].finishAttempts++;if(match.bonusPhase)match.sides[match.turn].trickAttempts++;
+ snapshot();match.sides[match.turn].shots++;if(ui.islandActive)match.sides[match.turn].islandAttempts++;if(match.sides[boardIndex()].cups.length===1)match.sides[match.turn].finishAttempts++;if(match.bonusPhase)match.sides[match.turn].trickAttempts++;
  if(match.bonusPhase){finishTrick();return}
  const island=!!ui.islandActive;ui.islandActive=false;
  if(match.comboBonusThrows>0)match.comboBonusThrows--;match.round.push({miss:true,island});
@@ -580,7 +598,7 @@ function discardFinishedMatch(){if(!match?.finished)return;match=null;go('home')
 function cancelMatch(){if(!match)return go('home');showAppConfirm('Spiel wirklich verlassen? Nicht gespeicherte Daten gehen verloren.',()=>{match=null;go('home')})}
 async function finishMatch(){
  if(!match?.finished||cloudSaving)return;
- const g={id:match.id,date:new Date().toISOString(),a:match.a,b:match.b,winner:match.winner,kind:match.kind,ref:match.ref,sides:match.sides.map((s,i)=>({remaining:s.cups.length,shots:s.shots,hits:s.hits,bombs:s.bombs,combos:s.combos,turns:s.turns-(match.halfTurnWinner===i?.5:0),trickAttempts:s.trickAttempts,trickHits:s.trickHits,finishAttempts:s.finishAttempts,finishHits:s.finishHits,normalFinishes:s.normalFinishes,comboFinishes:s.comboFinishes,bombFinishes:s.bombFinishes}))};
+ const g={id:match.id,date:new Date().toISOString(),a:match.a,b:match.b,winner:match.winner,kind:match.kind,ref:match.ref,sides:match.sides.map((s,i)=>({remaining:s.cups.length,shots:s.shots,hits:s.hits,bombs:s.bombs,combos:s.combos,turns:s.turns-(match.halfTurnWinner===i?.5:0),trickAttempts:s.trickAttempts,trickHits:s.trickHits,islandAttempts:s.islandAttempts,islandHits:s.islandHits,finishAttempts:s.finishAttempts,finishHits:s.finishHits,normalFinishes:s.normalFinishes,comboFinishes:s.comboFinishes,bombFinishes:s.bombFinishes}))};
  if(g.kind==='friendly'){
   cloudSaving=true;render();
   try{await saveFriendlyOnline(g);}
