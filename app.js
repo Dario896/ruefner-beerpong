@@ -300,7 +300,7 @@ function playerStats(){
  card('🏆 Average',row('Gesamt-AVG',formatAvg(cups,turns))+row('Höchster Winning-AVG',rec(bestWin))+row('Höchster Losing-AVG',rec(bestLoss)),true)+
  card('🎯 Wurfstatistik',row('Geworfene Bälle',shots)+row('Treffer',hits)+row('Trefferquote',formatPct(hits,shots))+row('Trickshot-Versuche',trickAttempts||complete?trickAttempts:'–')+row('Trickshot-Trefferquote',formatPct(trickHits,trickAttempts)))+
  card('🏁 Finishstatistik',row('Finishversuche',finishAttempts||complete?finishAttempts:'–')+row('Erfolgreiche Finishes',finishHits||complete?finishHits:'–')+row('Finishquote',formatPct(finishHits,finishAttempts))+row('Normale Finishes',normalFinishes||complete?normalFinishes:'–')+row('Kombifinishes',comboFinishes||complete?comboFinishes:'–')+row('Bombenfinishes',bombFinishes||complete?bombFinishes:'–'))+
- card('💣 Spezialstatistik',row('Bomben',bombs)+row('Kombinationen',combos)+row('🏝️ Island-Versuche',islandAttempts)+row('🏝️ Island-Treffer',islandHits)+row('🏝️ Island-Trefferquote',formatPct(islandHits,islandAttempts))+row('Becherdifferenz',(()=>{const d=gs.reduce((v,g)=>{const a=g.player_a===pid,s=a?g.side_a:g.side_b,o=a?g.side_b:g.side_a;return v+(Number(s?.remaining)||0)-(Number(o?.remaining)||0)},0);return (d>0?'+':'')+d})()))+
+ card('💣 Spezialstatistik',row('Bomben',bombs)+row('Kombinationen',combos)+row('Island-Versuche',islandAttempts)+row('Island-Treffer',islandHits)+row('Island-Trefferquote',formatPct(islandHits,islandAttempts))+row('Becherdifferenz',(()=>{const d=gs.reduce((v,g)=>{const a=g.player_a===pid,s=a?g.side_a:g.side_b,o=a?g.side_b:g.side_a;return v+(Number(s?.remaining)||0)-(Number(o?.remaining)||0)},0);return (d>0?'+':'')+d})()))+
  (complete<gs.length?`<p class="muted">Hinweis: Average und neue Detailwerte sind nur für die ${complete} Spiele ab V2.7 verfügbar. Ältere Ergebnisse bleiben erhalten.</p>`:'');
 }
 async function saveFriendlyOnline(g){
@@ -407,6 +407,16 @@ function processIslandChoices(){
   const hitCups=new Set(match.round.filter(x=>x.cup!==undefined).map(x=>x.cup));
   const allowed=match.sides[q.side].cups.filter(c=>q.kind==='miss'||!hitCups.has(c));
   if(!allowed.length)continue;
+  // When the opponent's last cups are already covered by this round's
+  // successful shots and Island bonuses, the match is decided. Settle a
+  // missed-Island penalty automatically rather than requesting another tap.
+  // The cup is still removed so the final cup difference stays correct.
+  const opponent=1-match.turn;
+  const opponentWillBeEmpty=match.sides[opponent].cups.every(c=>hitCups.has(c));
+  if(q.kind==='miss'&&opponentWillBeEmpty){
+   removeCups(q.side,[allowed[0]]);
+   continue;
+  }
   match.islandChoice={kind:q.kind,side:q.side,allowed};
   render();return;
  }
@@ -522,7 +532,7 @@ function afterNormalRound(){
 }
 function checkWin(){
  if(match.sides[0].cups.length&&match.sides[1].cups.length)return false;
- ui.trickFlash=null;clearTimeout(trickFlashTimer);match.finished=true;match.winner=match.sides[0].cups.length===0?match.b:match.a;
+ ui.trickFlash=null;clearTimeout(trickFlashTimer);match.finished=true;match.winner=match.sides[0].cups.length===0&&match.sides[1].cups.length===0?[match.a,match.b][match.turn]:(match.sides[0].cups.length===0?match.b:match.a);
  match.round=[];match.pending=null;match.islandChoice=null;match.islandQueue=[];ui.islandActive=false;match.bonus=false;match.tricks=0;match.bonusPhase=false;match.awaitingTrick=false;
  render();return true;
 }
