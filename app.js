@@ -848,16 +848,16 @@ function regularNight(l,n){
  const pairs=plPairs(l,n);
  const semi=pairs.map((pair,i)=>{
   const stage='semi'+(i+1),g=plGame(l,n,stage);
-  return `<div class="panel"><strong>Halbfinale ${i+1}</strong><p>${esc(name(pair[0]))} – ${esc(name(pair[1]))}</p>${g?plResultLine(g)+(onlineNavRole==='admin'?btn('Bearbeiten',`plEditMatch('${g.id}')`,'secondary'):''):btn('Spielen',`startPlGame('${l.id}',${n},'${stage}','${pair[0]}','${pair[1]}')`)}</div>`;
+  return `<div class="panel"><strong>Halbfinale ${i+1}</strong><p>${esc(name(pair[0]))} – ${esc(name(pair[1]))}</p>${g?plResultLine(g):btn('Spielen',`startPlGame('${l.id}',${n},'${stage}','${pair[0]}','${pair[1]}')`)}</div>`;
  }).join('');
  const a=plGame(l,n,'semi1'),b=plGame(l,n,'semi2'),fin=plGame(l,n,'final');
- return semi+`<div class="panel"><strong>Finale</strong><p>${a&&b?esc(name(a.winner))+' – '+esc(name(b.winner)):'Wartet auf beide Halbfinals'}</p>${fin?plResultLine(fin)+(onlineNavRole==='admin'?btn('Bearbeiten',`plEditMatch('${fin.id}')`,'secondary'):''):a&&b?btn('Finale spielen',`startPlGame('${l.id}',${n},'final','${a.winner}','${b.winner}')`):'<span class="muted">Gesperrt</span>'}</div>`;
+ return semi+`<div class="panel"><strong>Finale</strong><p>${a&&b?esc(name(a.winner))+' – '+esc(name(b.winner)):'Wartet auf beide Halbfinals'}</p>${fin?plResultLine(fin):a&&b?btn('Finale spielen',`startPlGame('${l.id}',${n},'final','${a.winner}','${b.winner}')`):'<span class="muted">Gesperrt</span>'}</div>`;
 }
 function finalNight(l){
  const rows=leagueStandings(l);
  return [['third',rows[2].pid,rows[3].pid,'Kleines Finale'],['final16',rows[0].pid,rows[1].pid,'Grosses Finale']].map(([stage,a,b,label])=>{
   const g=plGame(l,16,stage);
-  return `<div class="panel"><h3>${label}</h3><p>${esc(name(a))} – ${esc(name(b))}</p>${g?plResultLine(g)+(onlineNavRole==='admin'?btn('Bearbeiten',`plEditMatch('${g.id}')`,'secondary'):''):btn('Spielen',`startPlGame('${l.id}',16,'${stage}','${a}','${b}')`)}</div>`;
+  return `<div class="panel"><h3>${label}</h3><p>${esc(name(a))} – ${esc(name(b))}</p>${g?plResultLine(g):btn('Spielen',`startPlGame('${l.id}',16,'${stage}','${a}','${b}')`)}</div>`;
  }).join('');
 }
 function champion(l){return leagueGames(l).find(g=>g.ref?.stage==='final16')?.winner}
