@@ -302,10 +302,18 @@ function inStatsPeriod(date){
 }
 function periodControls(){return `<div class="panel"><div class="row">${[['30','🔥 Letzte 30 Tage'],['365','📅 Letztes Jahr'],['all','🏆 Gesamt']].map(([value,label])=>btn(label,`setStatsPeriod('${value}')`,statsPeriod===value?'':'secondary')).join('')}</div></div>`;}
 function setStatsPeriod(value){if(!['30','365','all'].includes(value))return;statsPeriod=value;render();}
+function allOnlineStatResults(){
+ const pl=db.games.filter(g=>g.kind==='league'&&db.leagues.some(l=>l.online&&l.id===g.ref?.league))
+  .map(g=>({client_match_id:g.id,player_a:plOnlineId(g.a),player_b:plOnlineId(g.b),winner:plOnlineId(g.winner),
+    side_a:g.sides[0],side_b:g.sides[1],played_at:g.date}));
+ const seen=new Set(cloudResults.map(g=>g.client_match_id).filter(Boolean));
+ return [...cloudResults,...pl.filter(g=>!seen.has(g.client_match_id))];
+}
 function cloudStatsTable(){
  if(!onlineDirectoryLoaded&&!onlineDirectoryLoading&&!onlineDirectoryError)setTimeout(loadOnlinePlayers,0);
  if(!cloudResultsLoaded&&!cloudResultsLoading&&!cloudResultsError)setTimeout(loadCloudResults,0);
- const periodResults=cloudResults.filter(g=>inStatsPeriod(g.played_at));
+ if(!plLoaded&&!plLoading&&!plError)setTimeout(()=>loadPlOnline(),0);
+ const periodResults=allOnlineStatResults().filter(g=>inStatsPeriod(g.played_at));
   const status=cloudResultsLoading?'Online-Statistik wird geladen …':cloudResultsError;
  const players=db.players.filter(p=>p.onlineId&&!p.isDeleted);
  const rows=players.map(p=>{
@@ -329,9 +337,7 @@ function formatAvg(cups,turns){return turns>0?(cups/turns).toFixed(2):'–';}
 function playerStats(){
  const pid=ui.playerStats,p=db.players.find(p=>p.onlineId===pid);
  if(!p||p.isDeleted)return `<div class="notice">Spieler nicht gefunden.</div>${btn('← Zurück',"go('stats')")}`;
- const plGs=db.games.filter(g=>g.kind==='league'&&(plOnlineId(g.a)===pid||plOnlineId(g.b)===pid))
-  .map(g=>({player_a:plOnlineId(g.a),player_b:plOnlineId(g.b),winner:plOnlineId(g.winner),side_a:g.sides[0],side_b:g.sides[1],played_at:g.date}));
- const allGs=[...cloudResults,...plGs];
+ const allGs=allOnlineStatResults();
  const gs=allGs.filter(g=>inStatsPeriod(g.played_at)&&(g.player_a===pid||g.player_b===pid));
  let shots=0,hits=0,trickAttempts=0,trickHits=0,islandAttempts=0,islandHits=0,finishAttempts=0,finishHits=0,normalFinishes=0,comboFinishes=0,bombFinishes=0,bombs=0,combos=0,turns=0,cups=0;
  let bestWin=null,bestLoss=null,complete=0;
@@ -774,7 +780,7 @@ function plPlayerStats(){
  block('Spezialstatistik',row('Bomben',x.bombs)+row('Kombinationen',x.combos)+row('Trickshot-Versuche',x.trickAttempts)+row('Trickshot-Treffer',x.trickHits)+row('Trickshot-Quote',formatPct(x.trickHits,x.trickAttempts))+row('Island-Versuche',x.islandAttempts)+row('Island-Treffer',x.islandHits)+row('Island-Quote',formatPct(x.islandHits,x.islandAttempts)))+
  block('Finishstatistik',row('Finishversuche',x.finishAttempts)+row('Erfolgreiche Finishes',x.finishHits)+row('Finishquote',formatPct(x.finishHits,x.finishAttempts)));
 }
-function standingsTable(rows){return `<div class="table-wrap"><table class="table"><thead><tr><th>#</th><th>Spieler</th><th>Pkt.</th><th>Nights</th><th>+/-</th><th>💣</th></tr></thead><tbody>${rows.map((x,i)=>`<tr><td>${i+1}</td><td>${esc(name(x.pid))}</td><td><strong>${x.points}</strong></td><td>${x.nights}</td><td>${x.diff>0?'+':''}${x.diff}</td><td>${x.bombs}</td></tr>`).join('')}</tbody></table></div>`}
+function standingsTable(rows,detailLeague=null){return `<div class="table-wrap"><table class="table"><thead><tr><th>#</th><th>Spieler</th><th>Pkt.</th><th>Nights</th><th>+/-</th><th>💣</th></tr></thead><tbody>${rows.map((x,i)=>`<tr><td>${i+1}</td><td>${detailLeague?`<button class="stats-player-link" onclick="plPlayerDetail('${detailLeague.id}','${x.pid}')">${esc(name(x.pid))}</button>`:esc(name(x.pid))}</td><td><strong>${x.points}</strong></td><td>${x.nights}</td><td>${x.diff>0?'+':''}${x.diff}</td><td>${x.bombs}</td></tr>`).join('')}</tbody></table></div>`}
 function regularNight(l,n){
  const pairs=plPairs(l,n);
  const semi=pairs.map((pair,i)=>{
@@ -839,9 +845,9 @@ function historyPage(){return `<h2>Spiele</h2>${db.games.map(g=>`<div class="pan
 function leagueStatsOverview(){
  if(!plLoaded&&!plLoading&&!plError)setTimeout(()=>loadPlOnline(),0);const leagues=db.leagues.filter(l=>l.online);
  if(!leagues.length)return `<div class="section"><h2>🏆 Premier-League-Statistik</h2></div><div class="panel"><p class="muted">Noch keine Premier-League-Saison vorhanden.</p></div>`;
- return `<div class="section"><h2>🏆 Premier-League-Statistik</h2><p class="muted">Online-Ligen · inklusive Saisonarchiv</p></div>`+leagues.map(l=>{
+ return `<div class="section"><h2>🏆 Premier-League-Statistik</h2></div>`+leagues.map(l=>{
   const standings=leagueStandings(l).filter(x=>!player(x.pid)?.isDeleted);
-  return `<div class="panel"><h3>${esc(l.title)} ${l.closed?'· Abgeschlossen':'· Aktiv'}</h3>${standingsTable(standings)}<p class="muted">Spieler auswählen für die vollständige PL-Statistik:</p><div class="row">${standings.map(x=>btn(esc(name(x.pid)),`plPlayerDetail('${l.id}','${x.pid}')`,'secondary')).join('')}</div><div class="row">${btn('Zur Premier League',"go('league')",'secondary')}</div></div>`;
+  return `<div class="panel"><h3>${esc(l.title)} ${l.closed?'· Abgeschlossen':'· Aktiv'}</h3>${standingsTable(standings,l)}</div>`;
  }).join('');
 }
 function stats(){
