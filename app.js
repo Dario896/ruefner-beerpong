@@ -358,8 +358,8 @@ function formatAvg(cups,turns){return turns>0?(cups/turns).toFixed(2):'–';}
 function playerStats(){
  const pid=ui.playerStats,p=db.players.find(p=>p.onlineId===pid);
  if(!p||p.isDeleted)return `<div class="notice">Spieler nicht gefunden.</div>${btn('← Zurück',"go('stats')")}`;
- const allGs=allOnlineStatResults();
- const gs=allGs.filter(g=>inStatsPeriod(g.played_at)&&(g.player_a===pid||g.player_b===pid));
+ const allGs=allOnlineStatResults().filter(g=>g.player_a===pid||g.player_b===pid);
+ const gs=allGs.filter(g=>inStatsPeriod(g.played_at));
  let shots=0,hits=0,trickAttempts=0,trickHits=0,islandAttempts=0,islandHits=0,finishAttempts=0,finishHits=0,normalFinishes=0,comboFinishes=0,bombFinishes=0,bombs=0,combos=0,turns=0,cups=0;
  let bestWin=null,bestLoss=null,complete=0;
  for(const g of allGs){
