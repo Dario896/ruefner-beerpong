@@ -407,6 +407,13 @@ function processIslandChoices(){
   const hitCups=new Set(match.round.filter(x=>x.cup!==undefined).map(x=>x.cup));
   const allowed=match.sides[q.side].cups.filter(c=>q.kind==='miss'||!hitCups.has(c));
   if(!allowed.length)continue;
+  // If only one additional opponent cup can be removed, there is no
+  // meaningful choice. Remove it automatically, including on throw two.
+  // Keep processing queued penalties before showing the winner.
+  if(q.kind==='hit'&&allowed.length===1){
+   removeCups(q.side,[allowed[0]]);
+   continue;
+  }
   // When the opponent's last cups are already covered by this round's
   // successful shots and Island bonuses, the match is decided. Settle a
   // missed-Island penalty automatically rather than requesting another tap.
@@ -437,7 +444,10 @@ function finishRegularThrows(){
   checkWin();
   return;
  }
- match.islandQueue=match.round.filter(q=>q.island).map(q=>({kind:q.miss?'miss':'hit',side:q.miss?match.turn:q.side}));
+ // Resolve successful Island bonuses first. Only afterwards settle penalties.
+ // Otherwise a miss on throw one wrongly prompts for an own cup before the
+ // winning Island bonus from throw two has been selected.
+ match.islandQueue=match.round.filter(q=>q.island).map(q=>({kind:q.miss?'miss':'hit',side:q.miss?match.turn:q.side})).sort((a,b)=>(a.kind==='miss')-(b.kind==='miss'));
  processIslandChoices();
 }
 
