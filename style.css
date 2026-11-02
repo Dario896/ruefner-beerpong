@@ -323,3 +323,14 @@
   .top-actions{flex:0 0 auto;}
 }
 @media(max-width:370px){.top .brand{font-size:clamp(28px, 8.6vw, 35px);}}
+
+/* V4.7.3 – Wortmarke fuellt die Hoehe der rechten Menue/Admin-Spalte.
+   Nur Layout; keine Daten- oder Spielaenderungen. */
+@media (max-width:650px){
+  .top{align-items:stretch;}
+  .top .brand{align-self:stretch;display:flex;align-items:stretch;padding-top:0;font-size:clamp(38px,10.5vw,48px);line-height:1;letter-spacing:-1.6px;}
+  .top .brand-lines{display:flex;flex-direction:column;justify-content:space-between;gap:0;padding:1px 0 3px;}
+}
+@media (max-width:370px){
+  .top .brand{font-size:clamp(31px,9.2vw,38px);letter-spacing:-1.4px;}
+}
