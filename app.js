@@ -59,7 +59,7 @@ window.addEventListener('popstate',()=>{
 function btn(text,fn,cls=''){return `<button class="btn ${cls}" onclick="${fn}">${text}</button>`}
 let onlineNavRole=null,onlineNavName='',onlineUserId=null;
 function header(){return `<div class="top"><div class="brand" onclick="go('home')" style="cursor:pointer">🏓 Rüfner <span>Beer Pong</span></div><div class="row">${db.current?`<span class="pill">${esc(name(db.current))}${reigningChampion()===db.current?' 👑':''}</span>`:''}${onlineNavRole==='player'?`<a class="btn secondary" style="text-decoration:none" href="online.html?logout=1">👤 ${esc(onlineNavName)} · Abmelden</a>`:`<a class="btn secondary" style="text-decoration:none" href="online.html">${onlineNavRole==='admin'?'👑 Admin':'🔐 Online'}</a>`}${btn('☰ Menü',"go('home')",'secondary')}</div></div>`}
-function render(){const root=document.getElementById('app');let body='';try{body=({home,profiles,profileDetail,training,friendship,league,stats,playerStats,rules,game,history,firstThrow})[view]?.()||home()}catch(e){body=`<div class="notice">Fehler: ${esc(e.message)}</div>${btn('Zurück',"go('home')")}`};root.innerHTML=`<div class="shell ${view==='game'?'shell-game':''}">${view==='game'?'':header()}${body}${view==='game'?'':'<footer>Rüfner Beer Pong</footer>'}</div>${appDialogMarkup()}${profileZoomMarkup()}`}
+function render(){const root=document.getElementById('app');let body='';try{body=({home,profiles,profileDetail,training,friendship,league,stats,playerStats,rules,game,history:historyPage,firstThrow})[view]?.()||home()}catch(e){body=`<div class="notice">Fehler: ${esc(e.message)}</div>${btn('Zurück',"go('home')")}`};root.innerHTML=`<div class="shell ${view==='game'?'shell-game':''}">${view==='game'?'':header()}${body}${view==='game'?'':'<footer>Rüfner Beer Pong</footer>'}</div>${appDialogMarkup()}${profileZoomMarkup()}`}
 let appDialog=null;
 function showAppAlert(message){appDialog={type:'alert',message:String(message)};render();}
 function showAppConfirm(message,onAccept){appDialog={type:'confirm',message:String(message),onAccept};render();}
@@ -555,7 +555,7 @@ function startLeagueSemi(lid,n){const a=document.getElementById('semiA').value,b
 function finalNight(l){const rows=leagueStandings(l),gs=nightGames(l,16);return [['third',rows[2].pid,rows[3].pid,'Spiel um Platz 3'],['final16',rows[0].pid,rows[1].pid,'Grand Final']].map(([stage,a,b,label])=>{const g=gs.find(g=>g.ref.stage===stage);return `<div class="panel"><h3>${label}</h3><p>${esc(name(a))} ⚔️ ${esc(name(b))}</p>${g?`<span class="badge">Sieger: ${esc(name(g.winner))}</span>`:isAdmin()?btn('Match starten',`startMatch('${a}','${b}','league',{league:'${l.id}',night:16,stage:'${stage}'})`):''}</div>`}).join('')}
 function champion(l){return leagueGames(l).find(g=>g.ref?.stage==='final16')?.winner}
 function showArchived(i){const l=db.leagues.find(x=>x.id===i);if(!l)return;ui.archive=i;document.getElementById('app').innerHTML=`<div class="shell">${header()}${btn('← Zurück',"go('league')",'secondary')}${leagueDetail(l)}</div>`}
-function history(){return `<h2>Spiele</h2>${db.games.map(g=>`<div class="panel">${esc(name(g.a))} gegen ${esc(name(g.b))} · ${esc(name(g.winner))} gewinnt</div>`).join('')}`}
+function historyPage(){return `<h2>Spiele</h2>${db.games.map(g=>`<div class="panel">${esc(name(g.a))} gegen ${esc(name(g.b))} · ${esc(name(g.winner))} gewinnt</div>`).join('')}`}
 // Die lokale PL-Statistik bleibt sichtbar; lokale Freundschaftsspiele nicht.
 function leagueStatsOverview(){
  const leagues=db.leagues;
