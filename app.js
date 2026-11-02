@@ -30,7 +30,7 @@ function name(i){return i==='COM'?'Rüfner 3000':(player(i)?.name||'Unbekannt')}
 function avatar(i){const p=player(i),cfg=window.RUEFNER_SUPABASE;const url=p?.onlineId&&cfg?.url?cfg.url+'/storage/v1/object/public/player-avatars/'+encodeURIComponent(p.onlineId)+'/avatar.jpg'+(p.photo?.includes('?v=')?'?v='+encodeURIComponent(p.photo.split('?v=')[1]):''):p?.photo;return `<span class="avatar">${url?`<img src="${esc(url)}" alt="" onerror="this.style.display='none';this.parentElement.textContent='${esc((p?.name||'?').slice(0,1).toUpperCase())}'">`:esc((p?.name||'🤖').slice(0,1).toUpperCase())}</span>`}
 function activeLeague(){return db.leagues.find(l=>!l.closed)}
 function isAdmin(){return db.current===db.admin}
-function reigningChampion(){const finished=db.leagues.filter(l=>l.closed&&champion(l)).sort((a,b)=>new Date(b.created)-new Date(a.created));return finished.length?champion(finished[0]):null}
+function reigningChampion(){const finished=db.leagues.filter(l=>l.online&&l.closed&&champion(l)).sort((a,b)=>new Date(b.created)-new Date(a.created));return finished.length?champion(finished[0]):null}
 function go(v){
  if(view===v&&v!=='profiles'){render();return;}
  window.history.pushState({ruefnerView:v,profileId:selectedProfileId},'','#'+v);
@@ -55,7 +55,7 @@ window.addEventListener('popstate',()=>{
  const target=window.history.state;
  view=target?.ruefnerView||'home';selectedProfileId=target?.profileId||null;
  if(view==='playerStats'&&target?.playerStatsId)ui.playerStats=target.playerStatsId;
- if(!['home','profiles','profileDetail','training','friendship','league','stats','playerStats','rules','game','history','firstThrow'].includes(view))view='home';
+ if(!['home','profiles','profileDetail','training','friendship','league','stats','playerStats','plPlayerDetail','rules','game','history','firstThrow'].includes(view))view='home';
  if(view==='game'&&!match)view='home';
  ui={};render();
 });
@@ -65,7 +65,7 @@ function header(){
  const account=onlineNavRole==='player'?'<a class="btn secondary" href="online.html?logout=1">🚪 Abmelden</a>':`<a class="btn secondary" href="online.html">${onlineNavRole==='admin'?'👑 Admin':'🔐 Online'}</a>`;
  return `<div class="top"><div class="brand" onclick="go('home')" style="cursor:pointer"><span class="brand-lines"><span class="brand-main">Rüfner</span><span class="brand-accent">Beer Pong</span></span></div><div class="top-actions">${btn('☰ Menü',"go('home')",'secondary')}${account}</div></div>`;
 }
-function render(){const root=document.getElementById('app');let body='';try{body=({home,profiles,profileDetail,training,friendship,league,stats,playerStats,rules,game,history:historyPage,firstThrow})[view]?.()||home()}catch(e){body=`<div class="notice">Fehler: ${esc(e.message)}</div>${btn('Zurück',"go('home')")}`};root.innerHTML=`<div class="shell ${view==='game'?'shell-game':''}">${view==='game'?'':header()}${body}${view==='game'?'':'<footer>Rüfner Beer Pong</footer>'}</div>${appDialogMarkup()}${profileZoomMarkup()}${profileStatusEditorMarkup()}`}
+function render(){const root=document.getElementById('app');let body='';try{body=({home,profiles,profileDetail,training,friendship,league,stats,playerStats,plPlayerDetail:plPlayerStats,rules,game,history:historyPage,firstThrow})[view]?.()||home()}catch(e){body=`<div class="notice">Fehler: ${esc(e.message)}</div>${btn('Zurück',"go('home')")}`};root.innerHTML=`<div class="shell ${view==='game'?'shell-game':''}">${view==='game'?'':header()}${body}${view==='game'?'':'<footer>Rüfner Beer Pong</footer>'}</div>${appDialogMarkup()}${profileZoomMarkup()}${profileStatusEditorMarkup()}`}
 let appDialog=null;
 function showAppAlert(message){appDialog={type:'alert',message:String(message)};render();}
 function showAppConfirm(message,onAccept){appDialog={type:'confirm',message:String(message),onAccept};render();}
@@ -329,8 +329,10 @@ function formatAvg(cups,turns){return turns>0?(cups/turns).toFixed(2):'–';}
 function playerStats(){
  const pid=ui.playerStats,p=db.players.find(p=>p.onlineId===pid);
  if(!p||p.isDeleted)return `<div class="notice">Spieler nicht gefunden.</div>${btn('← Zurück',"go('stats')")}`;
- const gs=cloudResults.filter(g=>inStatsPeriod(g.played_at)&&(g.player_a===pid||g.player_b===pid));
-  const allGs=cloudResults.filter(g=>g.player_a===pid||g.player_b===pid);
+ const plGs=db.games.filter(g=>g.kind==='league'&&(plOnlineId(g.a)===pid||plOnlineId(g.b)===pid))
+  .map(g=>({player_a:plOnlineId(g.a),player_b:plOnlineId(g.b),winner:plOnlineId(g.winner),side_a:g.sides[0],side_b:g.sides[1],played_at:g.date}));
+ const allGs=[...cloudResults,...plGs];
+ const gs=allGs.filter(g=>inStatsPeriod(g.played_at)&&(g.player_a===pid||g.player_b===pid));
  let shots=0,hits=0,trickAttempts=0,trickHits=0,islandAttempts=0,islandHits=0,finishAttempts=0,finishHits=0,normalFinishes=0,comboFinishes=0,bombFinishes=0,bombs=0,combos=0,turns=0,cups=0;
  let bestWin=null,bestLoss=null,complete=0;
  for(const g of allGs){
@@ -753,26 +755,84 @@ function startPlGame(lid,n,stage,a,b){
 function leagueGames(l){return l.games.map(i=>db.games.find(g=>g.id===i)).filter(Boolean)}
 function nightGames(l,n){return leagueGames(l).filter(g=>g.ref?.night===n)}
 function nightResult(l,n){const gs=nightGames(l,n),final=gs.find(g=>g.ref.stage==='final');return final?{winner:final.winner,runner:final.a===final.winner?final.b:final.a}:null}
-function leagueStandings(l){const ps=l.participants.map(pid=>({pid,points:0,nights:0,diff:0,bombs:0,wins:0,losses:0,shots:0,hits:0}));for(let n=1;n<=15;n++){const result=nightResult(l,n);if(result){ps.find(x=>x.pid===result.winner).points+=5;ps.find(x=>x.pid===result.winner).nights++;ps.find(x=>x.pid===result.runner).points+=2}}for(const g of leagueGames(l)){for(let i=0;i<2;i++){const pid=i===0?g.a:g.b,x=ps.find(p=>p.pid===pid);if(!x)continue;const side=g.sides[i],opp=g.sides[1-i];x.diff+=side.remaining-opp.remaining;x.bombs+=side.bombs;x.shots+=side.shots;x.hits+=side.hits;if(g.winner===pid)x.wins++;else x.losses++}}return ps.sort((a,b)=>b.points-a.points||b.nights-a.nights||b.diff-a.diff||b.bombs-a.bombs)}
-function leagueDetail(l){const standings=leagueStandings(l);const next=plCurrentNight(l);const done=nightGames(l,Math.min(next,16));return `<div class="hero"><div class="eyebrow">Saison ${esc(l.title)}</div><h1>${l.closed?'Saison abgeschlossen 👑':`Night ${next<=15?next:'16 · Finalabend'}`}</h1><p>${esc(l.participants.map(name).join(' · '))}</p></div><div class="panel"><h3>Rangliste · reguläre Saison</h3>${standingsTable(standings)}</div>${!l.closed?`<div class="panel"><h3>${next<=15?`Night ${next} · Halbfinals & Finale`:'Night 16 · Finalabend'}</h3>${next<=15?regularNight(l,next):finalNight(l)}</div>`:`<div class="panel"><h3>👑 Champion: ${esc(name(champion(l)))}</h3></div>`}<div class="panel"><h3>📊 Liga-Spielerstatistik</h3><div class="table-wrap"><table class="table"><thead><tr><th>Spieler</th><th>Spiele</th><th>Siege</th><th>Trefferquote</th><th>💣</th></tr></thead><tbody>${standings.map(x=>`<tr><td>${esc(name(x.pid))}</td><td>${x.wins+x.losses}</td><td>${x.wins}</td><td>${x.shots?(100*x.hits/x.shots).toFixed(1)+' %':'–'}</td><td>${x.bombs}</td></tr>`).join('')}</tbody></table></div></div><div class="panel"><h3>Alle Spielabende</h3>${Array.from({length:16},(_,i)=>{const gs=nightGames(l,i+1);return gs.length?`<details><summary>${i===15?'Finalabend':`Night ${i+1}`} · ${gs.length} Spiele</summary>${gs.map(g=>`<p>${esc(name(g.a))} ${g.sides[0].remaining} : ${g.sides[1].remaining} ${esc(name(g.b))} · Sieger: ${esc(name(g.winner))}</p>`).join('')}</details>`:''}).join('')||'<p class="muted">Noch keine Spiele erfasst.</p>'}</div>`}
+function leagueStandings(l){const ps=l.participants.map(pid=>({pid,points:0,nights:0,diff:0,bombs:0,combos:0,wins:0,losses:0,shots:0,hits:0,turns:0,cups:0,trickAttempts:0,trickHits:0,islandAttempts:0,islandHits:0,finishAttempts:0,finishHits:0}));for(let n=1;n<=15;n++){const result=nightResult(l,n);if(result){ps.find(x=>x.pid===result.winner).points+=5;ps.find(x=>x.pid===result.winner).nights++;ps.find(x=>x.pid===result.runner).points+=2}}for(const g of leagueGames(l)){for(let i=0;i<2;i++){const pid=i===0?g.a:g.b,x=ps.find(p=>p.pid===pid);if(!x)continue;const side=g.sides[i],opp=g.sides[1-i];x.diff+=side.remaining-opp.remaining;x.bombs+=Number(side.bombs)||0;x.combos+=Number(side.combos)||0;x.shots+=Number(side.shots)||0;x.hits+=Number(side.hits)||0;x.turns+=Number(side.turns)||0;x.cups+=10-(Number(opp.remaining)||0);
+ for(const k of ['trickAttempts','trickHits','islandAttempts','islandHits','finishAttempts','finishHits'])x[k]+=Number(side[k])||0;if(g.winner===pid)x.wins++;else x.losses++}}return ps.sort((a,b)=>b.points-a.points||b.nights-a.nights||b.diff-a.diff||b.bombs-a.bombs)}
+function leagueDetail(l){const standings=leagueStandings(l);const next=plCurrentNight(l);const done=nightGames(l,Math.min(next,16));return `<div class="hero"><div class="eyebrow">Saison ${esc(l.title)}</div><h1>${l.closed?'Saison abgeschlossen 👑':`Night ${next<=15?next:'16 · Finalabend'}`}</h1><p>${esc(l.participants.map(name).join(' · '))}</p></div><div class="panel"><h3>Rangliste · reguläre Saison</h3>${standingsTable(standings)}</div>${onlineNavRole==='admin'?`<div class="panel">${btn('Saison löschen',`plDeleteSeasonConfirm('${l.id}')`,'secondary')}</div>`:''}${!l.closed?`<div class="panel"><h3>${next<=15?`Night ${next} · Halbfinals & Finale`:'Night 16 · Finalabend'}</h3>${next<=15?regularNight(l,next):finalNight(l)}</div>`:`<div class="panel"><h3>👑 Champion: ${esc(name(champion(l)))}</h3></div>`}<div class="panel"><h3>📊 Liga-Spielerstatistik</h3><div class="table-wrap"><table class="table"><thead><tr><th>Spieler</th><th>Spiele</th><th>Siege</th><th>Trefferquote</th><th>💣</th></tr></thead><tbody>${standings.map(x=>`<tr><td>${esc(name(x.pid))}</td><td>${x.wins+x.losses}</td><td>${x.wins}</td><td>${x.shots?(100*x.hits/x.shots).toFixed(1)+' %':'–'}</td><td>${x.bombs}</td></tr>`).join('')}</tbody></table></div></div><div class="panel"><h3>Alle Spielabende</h3>${Array.from({length:16},(_,i)=>{const gs=nightGames(l,i+1);return gs.length?`<details><summary>${i===15?'Finalabend':`Night ${i+1}`} · ${gs.length} Spiele</summary>${gs.map(g=>`<p>${esc(name(g.a))} ${g.sides[0].remaining} : ${g.sides[1].remaining} ${esc(name(g.b))} · Sieger: ${esc(name(g.winner))}</p>`).join('')}</details>`:''}).join('')||'<p class="muted">Noch keine Spiele erfasst.</p>'}</div>`}
+function plPlayerDetail(lid,pid){
+ const l=db.leagues.find(x=>x.id===lid&&x.online);if(!l||!l.participants.includes(pid))return showAppAlert('Spieler nicht in dieser Saison.');
+ ui.plDetail={lid,pid};view='plPlayerDetail';render();
+}
+function plPlayerStats(){
+ const {lid,pid}=ui.plDetail||{},l=db.leagues.find(x=>x.id===lid&&x.online);
+ if(!l)return '<div class="notice">Saison nicht gefunden.</div>';
+ const x=leagueStandings(l).find(x=>x.pid===pid);if(!x)return '<div class="notice">Spieler nicht gefunden.</div>';
+ const row=(a,b)=>`<tr><td>${esc(a)}</td><td><strong>${esc(String(b))}</strong></td></tr>`;
+ const block=(title,items)=>`<details class="panel" open><summary><strong>${title}</strong></summary><div class="table-wrap"><table class="table"><tbody>${items}</tbody></table></div></details>`;
+ return `${btn('← Zur Statistik',"go('stats')",'secondary')}<h2>${esc(name(pid))} · ${esc(l.title)}</h2>`+
+ block('Premier League',row('Punkte',x.points)+row('Gewonnene Nights',x.nights)+row('Spiele',x.wins+x.losses)+row('Siege',x.wins)+row('Niederlagen',x.losses)+row('Becherdifferenz',(x.diff>0?'+':'')+x.diff))+
+ block('Average & Würfe',row('AVG',formatAvg(x.cups,x.turns))+row('Würfe',x.shots)+row('Treffer',x.hits)+row('Trefferquote',formatPct(x.hits,x.shots)))+
+ block('Spezialstatistik',row('Bomben',x.bombs)+row('Kombinationen',x.combos)+row('Trickshot-Versuche',x.trickAttempts)+row('Trickshot-Treffer',x.trickHits)+row('Trickshot-Quote',formatPct(x.trickHits,x.trickAttempts))+row('Island-Versuche',x.islandAttempts)+row('Island-Treffer',x.islandHits)+row('Island-Quote',formatPct(x.islandHits,x.islandAttempts)))+
+ block('Finishstatistik',row('Finishversuche',x.finishAttempts)+row('Erfolgreiche Finishes',x.finishHits)+row('Finishquote',formatPct(x.finishHits,x.finishAttempts)));
+}
 function standingsTable(rows){return `<div class="table-wrap"><table class="table"><thead><tr><th>#</th><th>Spieler</th><th>Pkt.</th><th>Nights</th><th>+/-</th><th>💣</th></tr></thead><tbody>${rows.map((x,i)=>`<tr><td>${i+1}</td><td>${esc(name(x.pid))}</td><td><strong>${x.points}</strong></td><td>${x.nights}</td><td>${x.diff>0?'+':''}${x.diff}</td><td>${x.bombs}</td></tr>`).join('')}</tbody></table></div>`}
 function regularNight(l,n){
  const pairs=plPairs(l,n);
  const semi=pairs.map((pair,i)=>{
   const stage='semi'+(i+1),g=plGame(l,n,stage);
-  return `<div class="panel"><strong>Halbfinale ${i+1}</strong><p>${esc(name(pair[0]))} – ${esc(name(pair[1]))}</p>${g?plResultLine(g):btn('Spielen',`startPlGame('${l.id}',${n},'${stage}','${pair[0]}','${pair[1]}')`)}</div>`;
+  return `<div class="panel"><strong>Halbfinale ${i+1}</strong><p>${esc(name(pair[0]))} – ${esc(name(pair[1]))}</p>${g?plResultLine(g)+(onlineNavRole==='admin'?btn('Bearbeiten',`plEditMatch('${g.id}')`,'secondary'):''):btn('Spielen',`startPlGame('${l.id}',${n},'${stage}','${pair[0]}','${pair[1]}')`)}</div>`;
  }).join('');
  const a=plGame(l,n,'semi1'),b=plGame(l,n,'semi2'),fin=plGame(l,n,'final');
- return semi+`<div class="panel"><strong>Finale</strong><p>${a&&b?esc(name(a.winner))+' – '+esc(name(b.winner)):'Wartet auf beide Halbfinals'}</p>${fin?plResultLine(fin):a&&b?btn('Finale spielen',`startPlGame('${l.id}',${n},'final','${a.winner}','${b.winner}')`):'<span class="muted">Gesperrt</span>'}</div>`;
+ return semi+`<div class="panel"><strong>Finale</strong><p>${a&&b?esc(name(a.winner))+' – '+esc(name(b.winner)):'Wartet auf beide Halbfinals'}</p>${fin?plResultLine(fin)+(onlineNavRole==='admin'?btn('Bearbeiten',`plEditMatch('${fin.id}')`,'secondary'):''):a&&b?btn('Finale spielen',`startPlGame('${l.id}',${n},'final','${a.winner}','${b.winner}')`):'<span class="muted">Gesperrt</span>'}</div>`;
 }
 function finalNight(l){
  const rows=leagueStandings(l);
  return [['third',rows[2].pid,rows[3].pid,'Kleines Finale'],['final16',rows[0].pid,rows[1].pid,'Grosses Finale']].map(([stage,a,b,label])=>{
   const g=plGame(l,16,stage);
-  return `<div class="panel"><h3>${label}</h3><p>${esc(name(a))} – ${esc(name(b))}</p>${g?plResultLine(g):btn('Spielen',`startPlGame('${l.id}',16,'${stage}','${a}','${b}')`)}</div>`;
+  return `<div class="panel"><h3>${label}</h3><p>${esc(name(a))} – ${esc(name(b))}</p>${g?plResultLine(g)+(onlineNavRole==='admin'?btn('Bearbeiten',`plEditMatch('${g.id}')`,'secondary'):''):btn('Spielen',`startPlGame('${l.id}',16,'${stage}','${a}','${b}')`)}</div>`;
  }).join('');
 }
 function champion(l){return leagueGames(l).find(g=>g.ref?.stage==='final16')?.winner}
+function plDeleteSeasonConfirm(lid){
+ if(onlineNavRole!=='admin')return;
+ const l=db.leagues.find(x=>x.id===lid&&x.online);if(!l)return;
+ showAppConfirm(`Saison "${l.title}" und alle ihre Premier-League-Ergebnisse endgültig löschen? Freundschaftsspiele bleiben erhalten.`,()=>plDeleteSeason(lid));
+}
+async function plDeleteSeason(lid){
+ try{
+  const {client}=await cloudUser();
+  const {error}=await client.rpc('ruefner_pl_delete_season',{p_season:lid});
+  if(error)throw error;
+  plLoaded=false;await loadPlOnline(true);go('league');
+ }catch(e){showAppAlert('Saison konnte nicht gelöscht werden: '+(e.message||e));}
+}
+function plEditMatch(gid){
+ if(onlineNavRole!=='admin')return;
+ const g=db.games.find(x=>x.id===gid&&x.kind==='league');if(!g)return;
+ const l=db.leagues.find(x=>x.id===g.ref.league);if(!l)return;
+ const finalAlreadyPlayed=g.ref.stage.startsWith('semi')&&!!plGame(l,g.ref.night,'final');
+ const winnerChoices=[g.a,g.b].map(pid=>`<option value="${esc(pid)}" ${g.winner===pid?'selected':''}>${esc(name(pid))}</option>`).join('');
+ const fields=['remaining','shots','hits','turns','bombs','combos','trickAttempts','trickHits','islandAttempts','islandHits','finishAttempts','finishHits','normalFinishes','comboFinishes','bombFinishes'];
+ const inputs=g.sides.map((side,i)=>`<div class="panel"><h3>${esc(name(i===0?g.a:g.b))}</h3>${fields.map(k=>`<div class="field"><label>${esc(k)}</label><input type="number" min="0" max="${k==='remaining'?10:9999}" id="pl_${i}_${k}" value="${Number(side[k])||0}"></div>`).join('')}</div>`).join('');
+ ui.plEdit=gid;
+ document.getElementById('app').innerHTML=`<div class="shell">${header()}<h2>PL-Begegnung bearbeiten</h2><p>${esc(l.title)} · Night ${g.ref.night}</p><div class="panel"><label>Sieger</label><select id="pl_winner" ${finalAlreadyPlayed?'disabled':''}>${winnerChoices}</select>${finalAlreadyPlayed?'<p class="muted">Nach einem gespielten Finale kann der Halbfinalsieger nicht geändert werden.</p>':''}</div>${inputs}${btn('Änderungen speichern',`plSaveMatchEdit('${gid}')`)} ${btn('Abbrechen',"go('league')",'secondary')}</div>`;
+}
+async function plSaveMatchEdit(gid){
+ if(onlineNavRole!=='admin')return;
+ const g=db.games.find(x=>x.id===gid&&x.kind==='league');if(!g)return;
+ const fields=['remaining','shots','hits','turns','bombs','combos','trickAttempts','trickHits','islandAttempts','islandHits','finishAttempts','finishHits','normalFinishes','comboFinishes','bombFinishes'];
+ const sides=g.sides.map((side,i)=>({...side,...Object.fromEntries(fields.map(k=>[k,Number(document.getElementById('pl_'+i+'_'+k)?.value)]))}));
+ if(sides.some(x=>fields.some(k=>!Number.isInteger(x[k])||x[k]<0||x[k]>(k==='remaining'?10:9999))))return showAppAlert('Ungültige Statistikwerte.');
+ if(sides.some(x=>x.hits>x.shots||x.islandHits>x.islandAttempts||x.trickHits>x.trickAttempts||x.finishHits>x.finishAttempts))return showAppAlert('Treffer dürfen Versuche nicht übersteigen.');
+ const winner=document.getElementById('pl_winner').value;
+ const wi=winner===g.a?0:1;
+ if(sides[wi].remaining<1||sides[1-wi].remaining!==0)return showAppAlert('Der Gewinner muss mindestens einen Becher und der Verlierer null Becher haben.');
+ try{
+  const {client}=await cloudUser();
+  const {error}=await client.rpc('ruefner_pl_edit_match',{p_match:gid,p_winner:plOnlineId(winner),p_side_a:sides[0],p_side_b:sides[1]});
+  if(error)throw error;
+  plLoaded=false;await loadPlOnline(true);go('league');
+ }catch(e){showAppAlert('Bearbeitung fehlgeschlagen: '+(e.message||e));}
+}
 function showArchived(i){const l=db.leagues.find(x=>x.id===i);if(!l)return;ui.archive=i;document.getElementById('app').innerHTML=`<div class="shell">${header()}${btn('← Zurück',"go('league')",'secondary')}${leagueDetail(l)}</div>`}
 function historyPage(){return `<h2>Spiele</h2>${db.games.map(g=>`<div class="panel">${esc(name(g.a))} gegen ${esc(name(g.b))} · ${esc(name(g.winner))} gewinnt</div>`).join('')}`}
 // Die lokale PL-Statistik bleibt sichtbar; lokale Freundschaftsspiele nicht.
@@ -781,7 +841,7 @@ function leagueStatsOverview(){
  if(!leagues.length)return `<div class="section"><h2>🏆 Premier-League-Statistik</h2></div><div class="panel"><p class="muted">Noch keine Premier-League-Saison vorhanden.</p></div>`;
  return `<div class="section"><h2>🏆 Premier-League-Statistik</h2><p class="muted">Online-Ligen · inklusive Saisonarchiv</p></div>`+leagues.map(l=>{
   const standings=leagueStandings(l).filter(x=>!player(x.pid)?.isDeleted);
-  return `<div class="panel"><h3>${esc(l.title)} ${l.closed?'· Abgeschlossen':'· Aktiv'}</h3>${standingsTable(standings)}<div class="row">${btn('Zur Premier League',"go('league')",'secondary')}</div></div>`;
+  return `<div class="panel"><h3>${esc(l.title)} ${l.closed?'· Abgeschlossen':'· Aktiv'}</h3>${standingsTable(standings)}<p class="muted">Spieler auswählen für die vollständige PL-Statistik:</p><div class="row">${standings.map(x=>btn(esc(name(x.pid)),`plPlayerDetail('${l.id}','${x.pid}')`,'secondary')).join('')}</div><div class="row">${btn('Zur Premier League',"go('league')",'secondary')}</div></div>`;
  }).join('');
 }
 function stats(){
