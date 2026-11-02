@@ -17,6 +17,7 @@ const formationPatterns={
 };
 const variantNames={6:['Grosse Pyramide'],5:['Full House 1','Full House 2','Full House 3'],4:['Vagina'],3:['Kleine Pyramide'],2:['Paar 1','Paar 2','Paar 3']};
 let db=load(),view='home',match=null,ui={},pendingStart=null;
+let selectedProfileId=null,profileZoom=false,profileStatusSaving=false;
 let trickFlashTimer=null;
 function dismissTrickFlash(){if(!ui.trickFlash)return;ui.trickFlash=null;clearTimeout(trickFlashTimer);if(view==='game')render()}
 function showTrickFlash(label){ui.trickFlash={label,until:Date.now()+5000};clearTimeout(trickFlashTimer);trickFlashTimer=setTimeout(()=>{ui.trickFlash=null;if(view==='game')render()},5050)}
@@ -30,11 +31,35 @@ function avatar(i){const p=player(i),cfg=window.RUEFNER_SUPABASE;const url=p?.on
 function activeLeague(){return db.leagues.find(l=>!l.closed)}
 function isAdmin(){return db.current===db.admin}
 function reigningChampion(){const finished=db.leagues.filter(l=>l.closed&&champion(l)).sort((a,b)=>new Date(b.created)-new Date(a.created));return finished.length?champion(finished[0]):null}
-function go(v){view=v;ui={};render()}
+function go(v){
+ if(view===v&&v!=='profiles'){render();return;}
+ window.history.pushState({ruefnerView:v,profileId:selectedProfileId},'','#'+v);
+ view=v;ui={};profileZoom=false;render();
+}
+function openPlayerProfile(pid){
+ selectedProfileId=pid;profileZoom=false;
+ window.history.pushState({ruefnerView:'profileDetail',profileId:pid},'','#profile-'+encodeURIComponent(pid));
+ view='profileDetail';ui={};render();
+}
+function closeProfileZoom(){profileZoom=false;render()}
+function openProfileZoom(){profileZoom=true;render()}
+window.addEventListener('popstate',()=>{
+ if(profileZoom){profileZoom=false;window.history.pushState({ruefnerView:view,profileId:selectedProfileId},'','#'+view);render();return;}
+ if(appDialog){appDialog=null;window.history.pushState({ruefnerView:view,profileId:selectedProfileId},'','#'+view);render();return;}
+ if(view==='game'&&match){
+  window.history.pushState({ruefnerView:'game'},'','#game');
+  showAppConfirm('Spiel wirklich verlassen? Nicht gespeicherte Daten gehen verloren.',()=>{match=null;go('home')});return;
+ }
+ const target=window.history.state;
+ view=target?.ruefnerView||'home';selectedProfileId=target?.profileId||null;
+ if(!['home','profiles','profileDetail','training','friendship','league','stats','playerStats','rules','game','history','firstThrow'].includes(view))view='home';
+ if(view==='game'&&!match)view='home';
+ ui={};render();
+});
 function btn(text,fn,cls=''){return `<button class="btn ${cls}" onclick="${fn}">${text}</button>`}
 let onlineNavRole=null,onlineNavName='',onlineUserId=null;
 function header(){return `<div class="top"><div class="brand" onclick="go('home')" style="cursor:pointer">🏓 Rüfner <span>Beer Pong</span></div><div class="row">${db.current?`<span class="pill">${esc(name(db.current))}${reigningChampion()===db.current?' 👑':''}</span>`:''}${onlineNavRole==='player'?`<a class="btn secondary" style="text-decoration:none" href="online.html?logout=1">👤 ${esc(onlineNavName)} · Abmelden</a>`:`<a class="btn secondary" style="text-decoration:none" href="online.html">${onlineNavRole==='admin'?'👑 Admin':'🔐 Online'}</a>`}${btn('☰ Menü',"go('home')",'secondary')}</div></div>`}
-function render(){const root=document.getElementById('app');let body='';try{body=({home,profiles,training,friendship,league,stats,playerStats,rules,game,history,firstThrow})[view]?.()||home()}catch(e){body=`<div class="notice">Fehler: ${esc(e.message)}</div>${btn('Zurück',"go('home')")}`};root.innerHTML=`<div class="shell ${view==='game'?'shell-game':''}">${view==='game'?'':header()}${body}${view==='game'?'':'<footer>Rüfner Beer Pong</footer>'}</div>${appDialogMarkup()}`}
+function render(){const root=document.getElementById('app');let body='';try{body=({home,profiles,profileDetail,training,friendship,league,stats,playerStats,rules,game,history,firstThrow})[view]?.()||home()}catch(e){body=`<div class="notice">Fehler: ${esc(e.message)}</div>${btn('Zurück',"go('home')")}`};root.innerHTML=`<div class="shell ${view==='game'?'shell-game':''}">${view==='game'?'':header()}${body}${view==='game'?'':'<footer>Rüfner Beer Pong</footer>'}</div>${appDialogMarkup()}${profileZoomMarkup()}`}
 let appDialog=null;
 function showAppAlert(message){appDialog={type:'alert',message:String(message)};render();}
 function showAppConfirm(message,onAccept){appDialog={type:'confirm',message:String(message),onAccept};render();}
@@ -42,12 +67,41 @@ function closeAppDialog(){appDialog=null;render();}
 function acceptAppDialog(){const action=appDialog?.onAccept;appDialog=null;if(action)action();else render();}
 function appDialogMarkup(){if(!appDialog)return '';return `<div class="app-dialog-backdrop" role="dialog" aria-modal="true" aria-label="Hinweis"><div class="app-dialog-card"><div class="app-dialog-icon">${appDialog.type==='confirm'?'⚠️':'🍻'}</div><h2>${appDialog.type==='confirm'?'Bist du sicher?':'Hinweis'}</h2><p>${esc(appDialog.message)}</p><div class="app-dialog-buttons">${appDialog.type==='confirm'?btn('Ja, Spiel verlassen','acceptAppDialog()','danger')+btn('Weiterspielen','closeAppDialog()','secondary'):btn('OK','closeAppDialog()')}</div></div></div>`;}
 function home(){return `<div class="welcome-mini">${db.current?`${avatar(db.current)}<strong>Willkommen zurück, ${esc(name(db.current))}! 🍻</strong>`:`<strong>Willkommen bei Rüfner Beer Pong! 🍻</strong>`}</div><div class="grid">${[['🤖','Training','Du gegen Rüfner 3000. Privat, ohne Statistik.','training'],['🏓','Freundschaftsspiel','Echte Duelle mit gemeinsamer Statistik.','friendship'],['🏆','Premier League','15 Nights und ein grosses Finale.','league'],['📊','Statistiken','Ranglisten, Bomben und direkte Duelle.','stats'],['👤','Profile','Spieler verwalten und Profilbild ändern.','profiles'],['📖','Regeln','Das Rüfner Beer Pong Reglement.','rules']].map(a=>`<button class="card action" onclick="go('${a[3]}')"><div class="emoji">${a[0]}</div><h3>${a[1]}</h3><p>${a[2]}</p></button>`).join('')}</div>`}
+function profileImageUrl(pid){
+ const p=player(pid),cfg=window.RUEFNER_SUPABASE;
+ if(!p)return '';
+ if(p.onlineId&&cfg?.url){const base=cfg.url+'/storage/v1/object/public/player-avatars/'+encodeURIComponent(p.onlineId)+'/avatar.jpg';return base+(p.photo?.includes('?v=')?'?v='+encodeURIComponent(p.photo.split('?v=')[1]):'');}
+ return p.photo||'';
+}
 function profiles(){
  if(!onlineDirectoryLoaded&&!onlineDirectoryLoading&&!onlineDirectoryError)setTimeout(loadOnlinePlayers,0);
- const p=db.players.find(x=>x.onlineId===onlineUserId&&!x.isDeleted);
- if(!onlineUserId)return `<div class="section"><h2>👤 Mein Profil</h2></div><div class="notice">Bitte zuerst online anmelden. Jedes Online-Konto hat genau ein Profil.</div>${btn('🔐 Anmelden',"location.href='online.html'")}`;
- if(!p)return `<div class="section"><h2>👤 Mein Profil</h2></div><div class="notice">Profil wird geladen … ${esc(onlineDirectoryError)}</div>${btn('↻ Aktualisieren','reloadOnlinePlayers()','secondary')}`;
- return `<div class="section"><h2>👤 Mein Profil</h2><p class="muted">Dein Profil ist fest mit deinem Online-Konto verbunden. Namen ändert ausschliesslich der Administrator in der Admin-Zentrale.</p></div><div class="card"><div class="row">${avatar(p.id)}<strong>${esc(p.name)}</strong></div><div class="row" style="margin-top:14px">${btn('📷 Profilbild ändern',"document.getElementById('ownPhotoInput').click()")}</div><input id="ownPhotoInput" type="file" accept="image/*" style="display:none" onchange="photoProfile(event)"><p class="muted" id="photoStatus">Das Bild wird für alle Geräte online gespeichert.</p></div>`;
+ if(!onlineUserId)return `<div class="section"><h2>👥 Spielerprofile</h2></div><div class="notice">Bitte zuerst online anmelden.</div>${btn('🔐 Anmelden',"location.href='online.html'")}`;
+ const players=db.players.filter(p=>p.onlineId&&!p.isDeleted).filter((p,i,arr)=>arr.findIndex(x=>x.onlineId===p.onlineId)===i).sort((a,b)=>a.name.localeCompare(b.name,'de'));
+ return `<div class="section"><h2>👥 Spielerprofile</h2><p class="muted">Alle registrierten Spieler · Profil antippen, um mehr zu sehen.</p></div>${onlineDirectoryError?`<div class="notice">${esc(onlineDirectoryError)}</div>`:''}${onlineDirectoryLoading?'<p class="muted">Spieler werden geladen …</p>':''}<div class="profile-directory">${players.map(p=>`<button class="profile-list-card" onclick="openPlayerProfile('${esc(p.id)}')">${avatar(p.id)}<span class="profile-list-name">${esc(p.name)} ${reigningChampion()===p.id?'👑':''}</span><span class="profile-list-arrow">›</span></button>`).join('')}</div>${btn('↻ Profile aktualisieren','reloadOnlinePlayers()','secondary')}`;
+}
+function profileDetail(){
+ const p=player(selectedProfileId);
+ if(!p||p.isDeleted)return `<div class="notice">Dieses Profil ist nicht mehr verfügbar.</div>${btn('Zu den Profilen',"go('profiles')")}`;
+ const own=!!onlineUserId&&p.onlineId===onlineUserId;
+ const status=p.status||'';
+ return `<div class="section"><h2>👤 Spielerprofil</h2></div><div class="card profile-detail"><button class="profile-photo-button" onclick="openProfileZoom()" aria-label="Profilbild vergrössern">${avatar(p.id)}<small>🔍 Bild vergrössern</small></button><h2>${esc(p.name)} ${reigningChampion()===p.id?'👑':''}</h2><div class="profile-status"><strong>💬 Status</strong><p>${status?esc(status):'<span class="muted">Noch kein Status eingetragen.</span>'}</p></div>${own?`<div class="field"><label>Deinen Status bearbeiten (max. 160 Zeichen)</label><textarea id="ownProfileStatus" maxlength="160" rows="3" placeholder="Dein Status …">${esc(status)}</textarea></div>${btn(profileStatusSaving?'Speichert …':'💾 Status speichern','saveProfileStatus()',profileStatusSaving?'secondary':'')}<div class="row" style="margin-top:14px">${btn('📷 Profilbild ändern',"document.getElementById('ownPhotoInput').click()",'secondary')}</div><input id="ownPhotoInput" type="file" accept="image/*" style="display:none" onchange="photoProfile(event)"><p class="muted" id="photoStatus">Status und Bild sind für alle angemeldeten Spieler sichtbar.</p>`:''}</div>`;
+}
+function profileZoomMarkup(){
+ if(!profileZoom)return '';
+ const url=profileImageUrl(selectedProfileId),p=player(selectedProfileId);
+ return `<div class="profile-zoom-overlay" role="dialog" aria-modal="true" aria-label="Profilbild" onclick="closeProfileZoom()"><button class="profile-zoom-close" onclick="closeProfileZoom()">✕</button>${url?`<img src="${esc(url)}" alt="Profilbild von ${esc(p?.name||'Spieler')}" onclick="event.stopPropagation()">`:`<div class="profile-zoom-placeholder">${esc((p?.name||'?').slice(0,1))}</div>`}</div>`;
+}
+async function saveProfileStatus(){
+ const p=player(selectedProfileId),field=document.getElementById('ownProfileStatus');
+ if(!p||p.onlineId!==onlineUserId||!field)return showAppAlert('Nur dein eigenes Profil darfst du bearbeiten.');
+ const status=field.value.trim();if(status.length>160)return showAppAlert('Maximal 160 Zeichen erlaubt.');
+ profileStatusSaving=true;
+ try{
+  const {client,user}=await cloudUser();if(user.id!==p.onlineId)throw Error('Falsches Konto.');
+  const {error}=await client.rpc('ruefner_set_profile_status',{new_status:status});
+  if(error)throw error;
+  p.status=status;save();profileStatusSaving=false;render();
+ }catch(e){profileStatusSaving=false;showAppAlert('Status konnte nicht gespeichert werden: '+(e.message||e)+'. Bitte zuerst die V4.5-SQL-Datei in Supabase ausführen.');}
 }
 // Nur das authentifizierte Online-Profil darf das eigene Foto bearbeiten.
 async function photoProfile(e){
@@ -85,7 +139,7 @@ async function loadOnlinePlayers(){
    return;
   }
   const {data:profiles,error}=await client.from('player_profiles')
-   .select('id,username,is_blocked,is_deleted').order('username');
+   .select('id,username,is_blocked,is_deleted,status').order('username');
   if(error)throw error;
   if(!Array.isArray(profiles))throw Error('Keine Spielerliste erhalten.');
   let changed=false;
@@ -96,9 +150,10 @@ async function loadOnlinePlayers(){
     if(existing.onlineId!==p.id){existing.onlineId=p.id;changed=true;}
      if(existing.isDeleted!==!!p.is_deleted){existing.isDeleted=!!p.is_deleted;changed=true;}
      if(existing.name!==p.username){existing.name=p.username;changed=true;}
+     if(existing.status!==(p.status||'')){existing.status=p.status||'';changed=true;}
     if(existing.onlineId){const shared=cfg.url+'/storage/v1/object/public/player-avatars/'+existing.onlineId+'/avatar.jpg';if(!existing.photo||!existing.photo.startsWith(shared)){existing.photo=shared;changed=true;}}
    }else{
-    db.players.push({id:'online-'+p.id,onlineId:p.id,name:p.username,photo:cfg.url+'/storage/v1/object/public/player-avatars/'+p.id+'/avatar.jpg',isDeleted:!!p.is_deleted});
+    db.players.push({id:'online-'+p.id,onlineId:p.id,name:p.username,status:p.status||'',photo:cfg.url+'/storage/v1/object/public/player-avatars/'+p.id+'/avatar.jpg',isDeleted:!!p.is_deleted});
     changed=true;
    }
    // Auch alte lokale Profile gleichen Namens ausblenden; Spiele und Ligen bleiben gespeichert.
@@ -114,7 +169,7 @@ async function loadOnlinePlayers(){
   onlineDirectoryError='Spielerliste konnte nicht geladen werden: '+(e.message||'Unbekannter Fehler');
  }finally{
   onlineDirectoryLoading=false;
-  if(view==='friendship'||view==='profiles'||view==='stats')render();
+  if(view==='friendship'||view==='profiles'||view==='profileDetail'||view==='stats')render();
  }
 }
 function reloadOnlinePlayers(){onlineDirectoryLoaded=false;loadOnlinePlayers();}
@@ -286,7 +341,7 @@ function chooseFirstThrow(side){
 }
 function beginMatch(a,b,kind,ref,difficulty,firstTurn){
  match={id:id(),a,b,kind,ref,difficulty,sides:[newSide(),newSide()],turn:firstTurn,round:[],pending:null,bonus:false,comboActive:false,comboBonusThrows:0,tricks:0,bonusPhase:false,bonusType:null,awaitingTrick:false,finished:false,log:[],undo:[]};
- match.sides[firstTurn].turns=1;view='game';render();if(isComTurn())computerTurn();
+ match.sides[firstTurn].turns=1;window.history.pushState({ruefnerView:'game'},'','#game');view='game';render();if(isComTurn())computerTurn();
 }
 const trickNames=['Extra hoch','Unter dem Bein','Augen zu','Rückwärts','Falsche Hand','Zweimal auf den Tisch','Pfeilbogen 🏹'];
 const trickWeights=[22,18,17,13,17,11,2];
@@ -516,6 +571,7 @@ function stats(){
  return `${periodControls()}${cloudStatsTable()}${leagueStatsOverview()}<div class="section"><h2>🤖 Höchster besiegter Rüfner 3000</h2></div><div class="panel">${db.players.filter(p=>!p.isDeleted).map(p=>`<p>${esc(p.name)}: <strong>${COM_NAMES[db.record[p.id]]||'Noch keiner'}</strong></p>`).join('')}</div>`;
 }
 function rules(){const sections=[['Aufstellen','10 Becher in Pyramidenform (4–3–2–1), mittig und ca. 10 cm von der Tischkante.'],['Anspiel','Ein Team beginnt mit zwei Würfen. Bei Uneinigkeit: Schere, Stein, Papier.'],['Werfen','Pro Team zwei Bälle pro Runde. Der Ellenbogen bleibt hinter der Tischkante.'],['Abwehren','Nicht direkte Würfe dürfen abgewehrt werden; direkte Würfe nicht. Bälle im Becher dürfen nicht herausgeblasen werden.'],['Kombinationen','Zwei unterschiedliche Becher: beide weg und zwei neue Würfe. Derselbe Becher: Bombe, dieser und drei nächstgelegene Becher weg, danach zwei neue Würfe.'],['Trickshot','Kommt der Ball ohne Fremdeinwirkung über die Tischmitte zurück, gibt es einen Trickshot.'],['Death Cup','Treffer in einen bereits getroffenen, aber noch stehenden Becher beendet das Spiel sofort.'],['Eigentor & umfallende Becher','Eigentore und umgefallene Becher haben eigene Strafregeln.'],['Zusammenstellen','Einmal pro Spiel, zu Beginn eines regulären eigenen Wurfs – niemals während einer Kombination oder ihrer Zusatzwürfe. Bei 6 Bechern grosse Pyramide; 5 Full House (3 Varianten); 4 Vagina; 3 kleine Pyramide; 2 Paar (3 Varianten).'],['Trinken','Getroffene Becher werden ausgetrunken; die Originalregeln enthalten zusätzliche Zeit- und Strafbestimmungen.']];return `<div class="section"><h2>📖 Rüfner Beer Pong Reglement</h2><p class="muted">Kurzübersicht. Das vollständige Originaldokument liegt der App bei.</p></div>${sections.map(([h,p])=>`<details><summary>${h}</summary><p>${p}</p></details>`).join('')}<div class="panel"><a class="btn" style="display:inline-block;text-decoration:none" href="reglement.pdf" target="_blank" rel="noopener">📄 Vollständiges Reglement (PDF)</a></div>`}
+window.history.replaceState({ruefnerView:'home'},'','#home');
 render();
 if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('./sw.js?v=37').catch(()=>{});
 
