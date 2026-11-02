@@ -389,18 +389,34 @@ function islandCandidates(){
 function canIsland(){return !!match&&!match.finished&&!match.pending&&!ui.ownGoal&&!isComTurn()&&!match.awaitingTrick&&!match.bonusPhase&&!match.islandActive&&match.round.length<2&&islandCandidates().length>0;}
 function toggleIsland(){if(!match||match.finished||match.pending||isComTurn()||match.awaitingTrick||match.bonusPhase||ui.ownGoal)return;if(ui.islandActive){ui.islandActive=false;render();return;}if(!canIsland())return;ui.islandActive=true;render();}
 function islandSelectionDone(){
- const p=match.islandChoice;match.islandChoice=null;
- if(p?.kind==='hit'){
-  // The hit cup stays available until round resolution so a second ball can hit it (bomb).
-  // A bonus selection must never choose an already-hit cup.
- }
- if(checkWin())return;
- if(match.round.length===2)resolveRound();else render();
+ match.islandChoice=null;
+ processIslandChoices();
 }
 function chooseIslandBonus(side,c){
  const p=match?.islandChoice;
  if(!p||p.side!==side||!p.allowed.includes(c))return;
  snapshot();removeCups(side,[c]);islandSelectionDone();
+}
+// Island choices are deliberately deferred until BOTH throws have been recorded.
+// This keeps the second throw available and preserves bombs/combinations.
+function processIslandChoices(){
+ if(!match||match.finished)return;
+ const queue=match.islandQueue||[];
+ while(queue.length){
+  const q=queue.shift();
+  const hitCups=new Set(match.round.filter(x=>x.cup!==undefined).map(x=>x.cup));
+  const allowed=match.sides[q.side].cups.filter(c=>q.kind==='miss'||!hitCups.has(c));
+  if(!allowed.length)continue;
+  match.islandChoice={kind:q.kind,side:q.side,allowed};
+  render();return;
+ }
+ match.islandQueue=[];
+ resolveRound();
+}
+function finishRegularThrows(){
+ if(match.round.length!==2)return;
+ match.islandQueue=match.round.filter(q=>q.island).map(q=>({kind:q.miss?'miss':'hit',side:q.miss?match.turn:q.side}));
+ processIslandChoices();
 }
 
 function cupBoard(sideIndex){
@@ -467,14 +483,9 @@ function recordHit(side,c){
  if(match.bonusPhase){removeCups(side,[c]);finishTrick();return}
  const island=!!ui.islandActive;ui.islandActive=false;
  if(match.comboBonusThrows>0)match.comboBonusThrows--;match.round.push({side,cup:c,island});
- if(island){
-  const hitCups=new Set(match.round.filter(q=>q.cup!==undefined).map(q=>q.cup));
-  const allowed=match.sides[side].cups.filter(x=>!hitCups.has(x));
-  if(allowed.length){match.islandChoice={kind:'hit',side,allowed};render();return;}
- }
  if(match.sides[side].cups.length===1){removeCups(side,[c]);checkWin();return}
  if(match.round.length<2){render();return}
- resolveRound();
+ finishRegularThrows();
 }
 function missShot(){
  if(!match||match.finished||match.pending||match.islandChoice||isComTurn()||match.awaitingTrick)return;
@@ -482,8 +493,7 @@ function missShot(){
  if(match.bonusPhase){finishTrick();return}
  const island=!!ui.islandActive;ui.islandActive=false;
  if(match.comboBonusThrows>0)match.comboBonusThrows--;match.round.push({miss:true,island});
- if(island&&match.sides[match.turn].cups.length){match.islandChoice={kind:'miss',side:match.turn,allowed:[...match.sides[match.turn].cups]};render();return;}
- if(match.round.length===2)resolveRound();else render();
+ if(match.round.length===2)finishRegularThrows();else render();
 }
 function resolveRound(){const r=match.round,side=boardIndex(),own=match.sides[match.turn];if(r.length!==2)return;const hits=r.filter(q=>q.cup!==undefined);if(hits.length===2&&hits[0].cup===hits[1].cup){own.bombs++;if(match.sides[side].cups.length<=4){own.finishAttempts++;own.finishHits++;own.bombFinishes++;}const c=hits[0].cup,origin=match.sides[side].positions[c];removeCups(side,[c]);if(match.sides[side].cups.length<=3){removeCups(side,[...match.sides[side].cups]);afterBomb();return}const remaining=3;if(remaining){match.pending={side,origin,remaining,allowed:[]};settleBomb();if(match.pending&&match.kind==='training'&&side===1){autoBomb();return}render();return}afterBomb();return}if(hits.length===2){own.combos++;if(match.sides[side].cups.length===2){own.finishAttempts++;own.finishHits++;own.comboFinishes++;}match.comboActive=true;match.comboBonusThrows=2;ui.rerack=false;removeCups(side,hits.map(q=>q.cup));match.round=[];if(checkWin())return;render();if(isComTurn())setTimeout(computerTurn,300);return}if(hits.length)removeCups(side,[hits[0].cup]);afterNormalRound()}
 function afterBomb(){if(checkWin())return;match.round=[];match.bonus=false;match.comboActive=true;match.comboBonusThrows=2;ui.rerack=false;render();if(isComTurn())setTimeout(computerTurn,350)}
@@ -495,12 +505,12 @@ function afterNormalRound(){
 function checkWin(){
  if(match.sides[0].cups.length&&match.sides[1].cups.length)return false;
  ui.trickFlash=null;clearTimeout(trickFlashTimer);match.finished=true;match.winner=match.sides[0].cups.length===0?match.b:match.a;
- match.round=[];match.pending=null;match.islandChoice=null;ui.islandActive=false;match.bonus=false;match.tricks=0;match.bonusPhase=false;match.awaitingTrick=false;
+ match.round=[];match.pending=null;match.islandChoice=null;match.islandQueue=[];ui.islandActive=false;match.bonus=false;match.tricks=0;match.bonusPhase=false;match.awaitingTrick=false;
  render();return true;
 }
 function endRound(){
  if(checkWin())return;
- match.round=[];match.islandChoice=null;ui.islandActive=false;match.bonus=false;match.tricks=0;match.bonusPhase=false;match.bonusType=null;match.awaitingTrick=false;
+ match.round=[];match.islandChoice=null;match.islandQueue=[];ui.islandActive=false;match.bonus=false;match.tricks=0;match.bonusPhase=false;match.bonusType=null;match.awaitingTrick=false;
  match.turn=1-match.turn;match.sides[match.turn].turns++;match.comboActive=false;match.comboBonusThrows=0;ui.rerack=false;render();
  if(isComTurn())setTimeout(computerTurn,500);
 }
@@ -561,7 +571,7 @@ function deathCup(){if(!match||match.kind==='training'||match.finished||match.pe
 function cancelDeathCup(){ui.deathCup=false;render()}
 function chooseDeathCupWinner(side){
  if(!match||!ui.deathCup||match.finished||![0,1].includes(side))return;
- snapshot();match.finished=true;match.winner=[match.a,match.b][side];match.round=[];match.pending=null;match.islandChoice=null;ui.islandActive=false;match.bonus=false;match.tricks=0;match.bonusPhase=false;match.awaitingTrick=false;match.comboActive=false;
+ snapshot();match.finished=true;match.winner=[match.a,match.b][side];match.round=[];match.pending=null;match.islandChoice=null;match.islandQueue=[];ui.islandActive=false;match.bonus=false;match.tricks=0;match.bonusPhase=false;match.awaitingTrick=false;match.comboActive=false;
  ui.deathCup=false;render();
 }
 function ownGoal(){if(!match||match.kind==='training'||match.finished||match.pending)return;ui.ownGoal=true;ui.rerack=false;render()}
