@@ -334,3 +334,13 @@
 @media (max-width:370px){
   .top .brand{font-size:clamp(31px,9.2vw,38px);letter-spacing:-1.4px;}
 }
+
+/* V4.7.4 – Logo-Zeilen wieder dicht beieinander, etwas groesser.
+   Ausschliesslich Darstellung; Menue/Admin und Daten unveraendert. */
+@media(max-width:650px){
+  .top .brand{align-self:flex-start;align-items:flex-start;font-size:clamp(39px,10.9vw,52px);line-height:.98;letter-spacing:-1.8px;padding-top:0;}
+  .top .brand-lines{justify-content:flex-start;gap:0;padding:0;}
+}
+@media(max-width:370px){
+  .top .brand{font-size:clamp(32px,9.3vw,41px);letter-spacing:-1.5px;}
+}
