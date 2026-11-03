@@ -53,11 +53,23 @@ window.addEventListener('popstate',()=>{
   showAppConfirm('Spiel wirklich verlassen? Nicht gespeicherte Daten gehen verloren.',()=>{match=null;go('home')});return;
  }
  const target=window.history.state;
+ // PL-Detailansicht: Geräte-Zurücktaste führt immer zur PL-Statistik,
+ // auch wenn ein älterer History-Eintrag noch auf das Hauptmenü zeigt.
+ if(view==='plPlayerDetail'){
+  view='stats';ui={};selectedProfileId=null;
+  window.history.replaceState({ruefnerView:'stats'},'','#stats');
+  render();
+  if(onlineUserId)setTimeout(()=>{refreshCloudResults();refreshPlOnline()},0);
+  return;
+ }
  view=target?.ruefnerView||'home';selectedProfileId=target?.profileId||null;
  if(view==='playerStats'&&target?.playerStatsId)ui.playerStats=target.playerStatsId;
  if(!['home','profiles','profileDetail','training','friendship','league','stats','playerStats','plPlayerDetail','rules','game','history','firstThrow'].includes(view))view='home';
  if(view==='game'&&!match)view='home';
- ui={};render();
+ ui={};
+ if(view==='plPlayerDetail'&&target?.plDetail)ui.plDetail=target.plDetail;
+ if(view==='playerStats'&&target?.playerStatsId)ui.playerStats=target.playerStatsId;
+ render();
 });
 function btn(text,fn,cls=''){return `<button class="btn ${cls}" onclick="${fn}">${text}</button>`}
 let onlineNavRole=null,onlineNavName='',onlineUserId=null;
@@ -796,7 +808,10 @@ function leagueStandings(l){const ps=l.participants.map(pid=>({pid,points:0,nigh
 function leagueDetail(l){const standings=leagueStandings(l);const next=plCurrentNight(l);const done=nightGames(l,Math.min(next,16));return `<div class="hero"><div class="eyebrow">Saison ${esc(l.title)}</div><h1>${l.closed?'Saison abgeschlossen 👑':`Night ${next<=15?next:'16 · Finalabend'}`}</h1><p>${esc(l.participants.map(name).join(' · '))}</p></div><div class="panel"><h3>Rangliste · reguläre Saison</h3>${standingsTable(standings)}</div>${!l.closed?`<div class="panel"><h3>${next<=15?`Night ${next} · Halbfinals & Finale`:'Night 16 · Finalabend'}</h3>${next<=15?regularNight(l,next):finalNight(l)}</div>`:`<div class="panel"><h3>👑 Champion: ${esc(name(champion(l)))}</h3></div>`}<div class="panel"><h3>Alle Spielabende</h3>${Array.from({length:16},(_,i)=>{const gs=nightGames(l,i+1);return gs.length?`<details><summary>${i===15?'Finalabend':`Night ${i+1}`} · ${gs.length} Spiele</summary>${gs.map(g=>`<p>${esc(name(g.a))} ${g.sides[0].remaining} : ${g.sides[1].remaining} ${esc(name(g.b))} · Sieger: ${esc(name(g.winner))}</p>`).join('')}</details>`:''}).join('')||'<p class="muted">Noch keine Spiele erfasst.</p>'}</div>`}
 function plPlayerDetail(lid,pid){
  const l=db.leagues.find(x=>x.id===lid&&x.online);if(!l||!l.participants.includes(pid))return showAppAlert('Spieler nicht in dieser Saison.');
- ui.plDetail={lid,pid};view='plPlayerDetail';render();
+ ui.plDetail={lid,pid};
+ if(view==='stats')window.history.replaceState({ruefnerView:'stats'},'','#stats');
+ window.history.pushState({ruefnerView:'plPlayerDetail',plDetail:{lid,pid}},'','#plPlayerDetail');
+ view='plPlayerDetail';render();
 }
 function plPlayerStats(){
  const {lid,pid}=ui.plDetail||{},l=db.leagues.find(x=>x.id===lid&&x.online);
