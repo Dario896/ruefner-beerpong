@@ -416,7 +416,7 @@ async function saveFriendlyOnline(g){
 function friendship(){
  if(!onlineDirectoryLoaded&&!onlineDirectoryLoading&&!onlineDirectoryError)setTimeout(loadOnlinePlayers,0);
  const directoryMessage=onlineDirectoryLoading?'Online-Spieler werden geladen …':onlineDirectoryError||'Online-Spieler geladen.';
- return `<div class="section"><h2>🏓 Freundschaftsspiel</h2><p class="muted">Ein Handy genügt. Freundschaftsspiele werden online gespeichert. Bitte vorher online anmelden.</p></div><div class="panel">${onlineDirectoryLoading||onlineDirectoryError?`<p class="muted">${esc(onlineDirectoryLoading?'Online-Spieler werden geladen …':onlineDirectoryError)}</p>`:''}${pairPicker()}${btn('Spiel starten',"startFriendly()")}</div>`;
+ return `<div class="section"><h2>🏓 Freundschaftsspiel</h2></div><div class="panel">${onlineDirectoryLoading||onlineDirectoryError?`<p class="muted">${esc(onlineDirectoryLoading?'Online-Spieler werden geladen …':onlineDirectoryError)}</p>`:''}${pairPicker()}${btn('Spiel starten',"startFriendly()")}</div>`;
 }
 function pairPicker(ids){const ps=ids||db.players.filter(p=>!p.isDeleted).filter((p,i,arr)=>arr.findIndex(q=>q.name.toLocaleLowerCase('de')===p.name.toLocaleLowerCase('de'))===i).map(p=>p.id);return `<div class="field"><label style="color:#69baff;font-weight:800">Spieler 1</label><select id="p1">${ps.map(p=>`<option value="${p}">${esc(name(p))}</option>`).join('')}</select></div><div class="field"><label style="color:#ff788e;font-weight:800">Spieler 2</label><select id="p2">${ps.map((p,i)=>`<option value="${p}" ${i===1?'selected':''}>${esc(name(p))}</option>`).join('')}</select></div>`}
 function startTraining(){if(!requireProfile())return;startMatch(db.current,'COM','training',null,Number(document.getElementById('difficulty').value))}
@@ -793,7 +793,7 @@ function nightGames(l,n){return leagueGames(l).filter(g=>g.ref?.night===n)}
 function nightResult(l,n){const gs=nightGames(l,n),final=gs.find(g=>g.ref.stage==='final');return final?{winner:final.winner,runner:final.a===final.winner?final.b:final.a}:null}
 function leagueStandings(l){const ps=l.participants.map(pid=>({pid,points:0,nights:0,diff:0,bombs:0,combos:0,wins:0,losses:0,shots:0,hits:0,turns:0,cups:0,trickAttempts:0,trickHits:0,islandAttempts:0,islandHits:0,finishAttempts:0,finishHits:0}));for(let n=1;n<=15;n++){const result=nightResult(l,n);if(result){ps.find(x=>x.pid===result.winner).points+=5;ps.find(x=>x.pid===result.winner).nights++;ps.find(x=>x.pid===result.runner).points+=2}}for(const g of leagueGames(l)){for(let i=0;i<2;i++){const pid=i===0?g.a:g.b,x=ps.find(p=>p.pid===pid);if(!x)continue;const side=g.sides[i],opp=g.sides[1-i];x.diff+=side.remaining-opp.remaining;x.bombs+=Number(side.bombs)||0;x.combos+=Number(side.combos)||0;x.shots+=Number(side.shots)||0;x.hits+=Number(side.hits)||0;x.turns+=Number(side.turns)||0;x.cups+=10-(Number(opp.remaining)||0);
  for(const k of ['trickAttempts','trickHits','islandAttempts','islandHits','finishAttempts','finishHits'])x[k]+=Number(side[k])||0;if(g.winner===pid)x.wins++;else x.losses++}}return ps.sort((a,b)=>b.points-a.points||b.nights-a.nights||b.diff-a.diff||b.bombs-a.bombs)}
-function leagueDetail(l){const standings=leagueStandings(l);const next=plCurrentNight(l);const done=nightGames(l,Math.min(next,16));return `<div class="hero"><div class="eyebrow">Saison ${esc(l.title)}</div><h1>${l.closed?'Saison abgeschlossen 👑':`Night ${next<=15?next:'16 · Finalabend'}`}</h1><p>${esc(l.participants.map(name).join(' · '))}</p></div><div class="panel"><h3>Rangliste · reguläre Saison</h3>${standingsTable(standings,l)}</div>${!l.closed?`<div class="panel"><h3>${next<=15?`Night ${next} · Halbfinals & Finale`:'Night 16 · Finalabend'}</h3>${next<=15?regularNight(l,next):finalNight(l)}</div>`:`<div class="panel"><h3>👑 Champion: ${esc(name(champion(l)))}</h3></div>`}<div class="panel"><h3>Alle Spielabende</h3>${Array.from({length:16},(_,i)=>{const gs=nightGames(l,i+1);return gs.length?`<details><summary>${i===15?'Finalabend':`Night ${i+1}`} · ${gs.length} Spiele</summary>${gs.map(g=>`<p>${esc(name(g.a))} ${g.sides[0].remaining} : ${g.sides[1].remaining} ${esc(name(g.b))} · Sieger: ${esc(name(g.winner))}</p>`).join('')}</details>`:''}).join('')||'<p class="muted">Noch keine Spiele erfasst.</p>'}</div>`}
+function leagueDetail(l){const standings=leagueStandings(l);const next=plCurrentNight(l);const done=nightGames(l,Math.min(next,16));return `<div class="hero"><div class="eyebrow">Saison ${esc(l.title)}</div><h1>${l.closed?'Saison abgeschlossen 👑':`Night ${next<=15?next:'16 · Finalabend'}`}</h1><p>${esc(l.participants.map(name).join(' · '))}</p></div><div class="panel"><h3>Rangliste · reguläre Saison</h3>${standingsTable(standings)}</div>${!l.closed?`<div class="panel"><h3>${next<=15?`Night ${next} · Halbfinals & Finale`:'Night 16 · Finalabend'}</h3>${next<=15?regularNight(l,next):finalNight(l)}</div>`:`<div class="panel"><h3>👑 Champion: ${esc(name(champion(l)))}</h3></div>`}<div class="panel"><h3>Alle Spielabende</h3>${Array.from({length:16},(_,i)=>{const gs=nightGames(l,i+1);return gs.length?`<details><summary>${i===15?'Finalabend':`Night ${i+1}`} · ${gs.length} Spiele</summary>${gs.map(g=>`<p>${esc(name(g.a))} ${g.sides[0].remaining} : ${g.sides[1].remaining} ${esc(name(g.b))} · Sieger: ${esc(name(g.winner))}</p>`).join('')}</details>`:''}).join('')||'<p class="muted">Noch keine Spiele erfasst.</p>'}</div>`}
 function plPlayerDetail(lid,pid){
  const l=db.leagues.find(x=>x.id===lid&&x.online);if(!l||!l.participants.includes(pid))return showAppAlert('Spieler nicht in dieser Saison.');
  ui.plDetail={lid,pid};view='plPlayerDetail';render();
@@ -824,7 +824,7 @@ function plPlayerStats(){
  const myWins=versus.filter(g=>g.winner===myPid).length;
  const duel=myPid&&myPid!==pid?card('⚔️ Direktvergleich · Du gegen '+esc(name(pid)),
   row('Spiele gegeneinander',versus.length)+row('Deine Siege',myWins)+row('Deine Niederlagen',versus.length-myWins)+row('Deine Siegquote',formatPct(myWins,versus.length)),true):'';
- return `<div class="stats-back-row">${btn('← Zur Premier League',"go('league')",'secondary')}</div><div class="section player-stats-intro"><h2 class="player-stats-heading">${p?`<button class="stats-avatar-zoom" onclick="openStatsPhoto('${p.id}')" aria-label="Profilbild vergrössern">${avatar(p.id)}</button>`:''}<span>${esc(name(pid))}</span></h2>${p?.status?`<p class="player-stats-status">${esc(p.status)}</p>`:''}<p class="muted">${esc(l.title)} · ${x.points} Punkte · ${x.nights} gewonnene Nights</p></div>`+duel+
+ return `<div class="stats-back-row">${btn('← Zur Statistik',"go('stats')",'secondary')}</div><div class="section player-stats-intro"><h2 class="player-stats-heading">${p?`<button class="stats-avatar-zoom" onclick="openStatsPhoto('${p.id}')" aria-label="Profilbild vergrössern">${avatar(p.id)}</button>`:''}<span>${esc(name(pid))}</span></h2>${p?.status?`<p class="player-stats-status">${esc(p.status)}</p>`:''}<p class="muted">${esc(l.title)} · ${x.points} Punkte · ${x.nights} gewonnene Nights</p></div>`+duel+
  card('🏆 Premier League',row('Punkte',x.points)+row('Gewonnene Nights',x.nights)+row('Spiele',x.wins+x.losses)+row('Siege',x.wins)+row('Niederlagen',x.losses),true)+
  card('🏆 Average',row('Gesamt-AVG',formatAvg(cups,turns))+row('Höchster Winning-AVG',rec(bestWin))+row('Höchster Losing-AVG',rec(bestLoss)),true)+
  card('🎯 Wurfstatistik',row('Geworfene Bälle',x.shots)+row('Treffer',x.hits)+row('Trefferquote',formatPct(x.hits,x.shots))+row('Trickshot-Versuche',x.trickAttempts)+row('Trickshot-Trefferquote',formatPct(x.trickHits,x.trickAttempts)))+
@@ -838,18 +838,18 @@ function standingsTable(rows,detailLeague=null){return `<style>
 .pl-standings th:nth-child(2),.pl-standings td:nth-child(2){width:35%;text-align:left}
 .pl-standings th:nth-child(n+3),.pl-standings td:nth-child(n+3){width:14.5%;text-align:center}
 .pl-standings td,.pl-standings th{padding:9px 4px}
-.pl-standings .stats-player-link{display:flex;gap:7px;align-items:center;max-width:100%;min-width:0;width:100%;}
-.pl-standings .stats-player-link .avatar{width:30px;height:30px;flex:0 0 30px}
-.pl-standings .stats-player-link span:last-child{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;overflow-wrap:normal}
+.pl-standings .pl-player-label{cursor:default;pointer-events:none;user-select:text}.pl-standings .stats-player-link,.pl-standings .pl-player-label{display:flex;gap:7px;align-items:center;max-width:100%;min-width:0;width:100%;}
+.pl-standings .stats-player-link .avatar,.pl-standings .pl-player-label .avatar{width:30px;height:30px;flex:0 0 30px}
+.pl-standings .stats-player-link span:last-child,.pl-standings .pl-player-label span:last-child{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;overflow-wrap:normal}
 @media(max-width:520px){
  .pl-standings th,.pl-standings td{padding:8px 2px;font-size:11px}
  .pl-standings th:first-child,.pl-standings td:first-child{width:6%}
  .pl-standings th:nth-child(2),.pl-standings td:nth-child(2){width:34%}
  .pl-standings th:nth-child(n+3),.pl-standings td:nth-child(n+3){width:15%}
- .pl-standings .stats-player-link{gap:4px;font-size:11px}
- .pl-standings .stats-player-link .avatar{width:23px;height:23px;flex-basis:23px}
+ .pl-standings .stats-player-link,.pl-standings .pl-player-label{gap:4px;font-size:11px}
+ .pl-standings .stats-player-link .avatar,.pl-standings .pl-player-label .avatar{width:23px;height:23px;flex-basis:23px}
 }
-</style><div class="table-wrap"><table class="table compact-stats pl-standings"><thead><tr><th>#</th><th>Spieler</th><th>Pkt.</th><th>Nights</th><th>+/-</th><th>💣</th></tr></thead><tbody>${rows.map((x,i)=>`<tr><td>${i+1}</td><td>${detailLeague?`<button class="stats-player-link" onclick="plPlayerDetail('${detailLeague.id}','${x.pid}')">${avatar(x.pid)}<span>${esc(name(x.pid))}</span></button>`:`<span class="stats-player-link">${avatar(x.pid)}<span>${esc(name(x.pid))}</span></span>`}</td><td><strong>${x.points}</strong></td><td>${x.nights}</td><td>${x.diff>0?'+':''}${x.diff}</td><td>${x.bombs}</td></tr>`).join('')}</tbody></table></div>`}
+</style><div class="table-wrap"><table class="table compact-stats pl-standings"><thead><tr><th>#</th><th>Spieler</th><th>Pkt.</th><th>Nights</th><th>+/-</th><th>💣</th></tr></thead><tbody>${rows.map((x,i)=>`<tr><td>${i+1}</td><td>${detailLeague?`<button class="stats-player-link" onclick="plPlayerDetail('${detailLeague.id}','${x.pid}')">${avatar(x.pid)}<span>${esc(name(x.pid))}</span></button>`:`<span class="pl-player-label">${avatar(x.pid)}<span>${esc(name(x.pid))}</span></span>`}</td><td><strong>${x.points}</strong></td><td>${x.nights}</td><td>${x.diff>0?'+':''}${x.diff}</td><td>${x.bombs}</td></tr>`).join('')}</tbody></table></div>`}
 function regularNight(l,n){
  const pairs=plPairs(l,n);
  const semi=pairs.map((pair,i)=>{
@@ -916,7 +916,7 @@ function leagueStatsOverview(){
  if(!leagues.length)return `<div class="section"><h2>🏆 Premier-League-Statistik</h2></div><div class="panel"><p class="muted">Noch keine Premier-League-Saison vorhanden.</p></div>`;
  return `<div class="section"><h2>🏆 Premier-League-Statistik</h2></div>`+leagues.map(l=>{
   const standings=leagueStandings(l).filter(x=>!player(x.pid)?.isDeleted);
-  return `<div class="panel"><h3>${esc(l.title)} ${l.closed?'· Abgeschlossen':'· Aktiv'}</h3>${standingsTable(standings)}</div>`;
+  return `<div class="panel"><h3>${esc(l.title)} ${l.closed?'· Abgeschlossen':'· Aktiv'}</h3>${standingsTable(standings,l)}</div>`;
  }).join('');
 }
 function stats(){
