@@ -438,7 +438,9 @@ const ACHIEVEMENTS=[
  ['🏁','Perfektes Ende','In der letzten Aufnahme mindestens 5 Becher entfernen und gewinnen'],
  ['🦾','Bezwinger des Unbesiegbaren','Rüfner 3000 auf Unbesiegbar besiegen'],
  ['🗡️','Doppelter Todesstoss','Aufnahme mit 2 Bechern beginnen und mit beiden regulären Würfen finishen'],
- ['⚰️','Vierer-Todesstoss','Aufnahme mit 4 Bechern beginnen und mit einer Bombe alle vier entfernen']
+ ['⚰️','Vierer-Todesstoss','Aufnahme mit 4 Bechern beginnen und mit einer Bombe alle vier entfernen'],
+ ['🪑','King of the Table','Drei Spiele hintereinander im King-of-the-Table-Modus gewinnen (in einem späteren Update verfügbar)'],
+ ['🔗','Kombinationskönig','Mindestens 2 echte Kombinationen in einem Spiel erzielen, auch in derselben Aufnahme. Trickshots zählen nicht.']
 ];
 function achievementRowsFor(pid){
  const p=db.players.find(p=>p.onlineId===pid),records=allOnlineStatResults()
@@ -473,6 +475,9 @@ function achievementRowsFor(pid){
   add(26,win&&Number(s.achievementLastTurn)>=5);
   add(28,win&&s.achievementComboFinish===true);
   add(29,win&&s.achievementFourFinish===true);
+  // Bereits gespeicherte Kombinationen werden auch rückwirkend ausgewertet.
+  // Die Spiellogik zählt nur zwei Treffer auf unterschiedliche Becher als Kombination.
+  add(31,Number(s.combos)>=2);
   streak=win?streak+1:0;if(streak>=5)got.add(2);
   coldStreak=win&&Number(s.bombs)===0?coldStreak+1:0;if(coldStreak>=3)got.add(8);
  }
@@ -490,7 +495,7 @@ function achievementRowsFor(pid){
 }
 function achievementMarkup(pid){
  const earned=achievementRowsFor(pid);
- return `<div class="panel achievement-panel"><style>.achievement-icons{display:flex;flex-wrap:wrap;gap:9px;margin-top:12px}.achievement-icon{font-size:27px;min-width:49px;min-height:49px;border-radius:12px;background:#172d35;border:1px solid #386574;cursor:pointer}</style><h3>🏅 Auszeichnungen · ${earned.length}/30</h3>${earned.length?`<div class="achievement-icons">${earned.map(i=>`<button type="button" class="achievement-icon" onclick="showAchievement(${i})" aria-label="${esc(ACHIEVEMENTS[i][1])}">${ACHIEVEMENTS[i][0]}</button>`).join('')}</div>`:'<p class="muted">Noch keine Auszeichnungen freigeschaltet.</p>'}</div>`;
+ return `<div class="panel achievement-panel"><style>.achievement-icons{display:flex;flex-wrap:wrap;gap:9px;margin-top:12px}.achievement-icon{font-size:27px;min-width:49px;min-height:49px;border-radius:12px;background:#172d35;border:1px solid #386574;cursor:pointer}</style><h3>🏅 Auszeichnungen · ${earned.length}/${ACHIEVEMENTS.length}</h3>${earned.length?`<div class="achievement-icons">${earned.map(i=>`<button type="button" class="achievement-icon" onclick="showAchievement(${i})" aria-label="${esc(ACHIEVEMENTS[i][1])}">${ACHIEVEMENTS[i][0]}</button>`).join('')}</div>`:'<p class="muted">Noch keine Auszeichnungen freigeschaltet.</p>'}</div>`;
 }
 function showAchievement(i){const a=ACHIEVEMENTS[i];if(a)showAppAlert(`${a[0]} ${a[1]}\n\n${a[2]}`)}
 
