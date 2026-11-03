@@ -169,7 +169,7 @@ async function photoProfile(e){
   const image=await new Promise((resolve,reject)=>{const r=new FileReader();r.onerror=reject;r.onload=()=>{const im=new Image();im.onerror=reject;im.onload=()=>{const c=document.createElement('canvas');c.width=c.height=240;const ctx=c.getContext('2d');const z=Math.min(im.width,im.height);ctx.drawImage(im,(im.width-z)/2,(im.height-z)/2,z,z,0,0,240,240);c.toBlob(blob=>blob?resolve(blob):reject(Error('Bild konnte nicht verarbeitet werden.')),'image/jpeg',.8)};im.src=r.result};r.readAsDataURL(f)});
   const path=user.id+'/avatar.jpg';const {error}=await client.storage.from('player-avatars').upload(path,image,{contentType:'image/jpeg',upsert:true});if(error)throw error;
   const url=client.storage.from('player-avatars').getPublicUrl(path).data.publicUrl+'?v='+Date.now();
-  const p=db.players.find(x=>x.onlineId===user.id);if(p){p.photo=url;p.photoUploaded=true;save();}render();
+  const p=db.players.find(x=>x.onlineId===user.id);if(p){p.photo=url;p.photoUploaded=true;p.avatarCloudUploaded=true;save();}render();
  }catch(err){showAppAlert('Profilbild konnte nicht online gespeichert werden: '+(err.message||err)+'\nBitte zuerst die beiliegende Supabase-SQL-Einrichtung ausführen.');}
 }
 function requireProfile(){if(!onlineUserId||!db.players.some(p=>p.id===db.current&&p.onlineId===onlineUserId)){go('profiles');return false}return true}
@@ -194,7 +194,7 @@ async function loadOnlinePlayers(){
    return;
   }
   const {data:profiles,error}=await client.from('player_profiles')
-   .select('id,username,is_blocked,is_deleted,status,best_com_level').order('username');
+   .select('id,username,is_blocked,is_deleted,status,best_com_level,training_played').order('username');
   if(error)throw error;
   if(!Array.isArray(profiles))throw Error('Keine Spielerliste erhalten.');
   let changed=false;
@@ -206,9 +206,10 @@ async function loadOnlinePlayers(){
      if(existing.isDeleted!==!!p.is_deleted){existing.isDeleted=!!p.is_deleted;changed=true;}
      if(existing.name!==p.username){existing.name=p.username;changed=true;}
      if(existing.status!==(p.status||'')){existing.status=p.status||'';changed=true;}
+     existing.trainingPlayedCloud=p.training_played===true;existing.bestComCloud=p.best_com_level;
     if(existing.onlineId){const shared=cfg.url+'/storage/v1/object/public/player-avatars/'+existing.onlineId+'/avatar.jpg';if(!existing.photo||!existing.photo.startsWith(shared)){existing.photo=shared;changed=true;}}
    }else{
-    db.players.push({id:'online-'+p.id,onlineId:p.id,name:p.username,status:p.status||'',photo:cfg.url+'/storage/v1/object/public/player-avatars/'+p.id+'/avatar.jpg',isDeleted:!!p.is_deleted});
+    db.players.push({id:'online-'+p.id,onlineId:p.id,name:p.username,status:p.status||'',trainingPlayedCloud:p.training_played===true,bestComCloud:p.best_com_level,photo:cfg.url+'/storage/v1/object/public/player-avatars/'+p.id+'/avatar.jpg',isDeleted:!!p.is_deleted});
     changed=true;
    }
    // Online-Rekord übernehmen, ohne einen höheren lokalen Rekord zu verlieren.
@@ -231,6 +232,14 @@ async function loadOnlinePlayers(){
     }
    }
   }
+  // Avatar-Nachweis wird vom Server geprüft (keine erfundene Standard-URL).
+  try{
+   const {data:avatarFlags,error:avatarError}=await client.rpc('ruefner_avatar_flags');
+   if(!avatarError&&Array.isArray(avatarFlags))for(const row of avatarFlags){
+    const target=db.players.find(x=>x.onlineId===row.player_id);
+    if(target)target.avatarCloudUploaded=row.has_avatar===true;
+   }
+  }catch(e){console.warn('Avatar-Status nicht verfügbar:',e);}
   if(changed)save();
   onlineDirectoryLoaded=true;
  }catch(e){
@@ -241,6 +250,12 @@ async function loadOnlinePlayers(){
  }
 }
 function reloadOnlinePlayers(){onlineDirectoryLoaded=false;loadOnlinePlayers();}
+async function syncTrainingPlayed(){
+ const {client}=await cloudUser();
+ const {error}=await client.rpc('ruefner_mark_training_played');
+ if(error)throw error;
+ const p=db.players.find(p=>p.onlineId===onlineUserId);if(p){p.trainingPlayedCloud=true;save();}
+}
 async function syncComRecord(level){
  if(!Number.isInteger(level)||level<0||level>5)return;
  const {client}=await cloudUser();
@@ -435,7 +450,7 @@ function achievementRowsFor(pid){
   if(!s||!o)continue;
   const win=g.winner===pid,shots=Number(s.shots)||0,hits=Number(s.hits)||0;
   const add=(n,ok)=>{if(ok)got.add(n)};
-  add(0,shots>0&&hits/shots>=.5);
+  add(0,win&&shots>0&&hits/shots>=.5);
   add(1,Number(s.bombs)>=2);
   add(4,win&&shots>0&&hits/shots<.1);
   add(5,win&&Number(s.remaining)===10);
@@ -467,10 +482,10 @@ function achievementRowsFor(pid){
  const allSeasons=db.leagues.filter(l=>l.online&&l.closed&&champion(l)).sort((a,b)=>new Date(a.created)-new Date(b.created));
  for(let i=1;i<allSeasons.length;i++)if(plOnlineId(champion(allSeasons[i]))===pid&&plOnlineId(champion(allSeasons[i-1]))===pid)got.add(10);
  // Avatar-Datei kann ohne tatsächlichen Upload eine Standard-URL sein.
- if(p?.status?.trim()&&p?.photoUploaded===true)got.add(22);
+ if(p?.status?.trim()&&(p?.avatarCloudUploaded===true||p?.photoUploaded===true&&p?.onlineId===onlineUserId))got.add(22);
  const training=p&&db.trainingAchievements?.[p.id];
- if(training?.played)got.add(24);
- if(training?.unbeatable||p&&Number(db.record?.[p.id])===5)got.add(27);
+ if(training?.played||p?.trainingPlayedCloud===true)got.add(24);
+ if(training?.unbeatable||p&&Number(db.record?.[p.id])===5||p?.bestComCloud===5)got.add(27);
  return [...got].sort((a,b)=>a-b);
 }
 function achievementMarkup(pid){
@@ -897,6 +912,7 @@ async function finishMatch(){
   db.trainingAchievements=db.trainingAchievements||{};
   const t=db.trainingAchievements[match.a]||(db.trainingAchievements[match.a]={played:false,unbeatable:false});
   t.played=true;
+  try{await syncTrainingPlayed();}catch(e){console.warn('Training noch nicht online synchronisiert:',e);}
   if(match.winner===match.a&&match.difficulty===5)t.unbeatable=true;
   if(match.winner===match.a){
    const old=db.record[match.a]??-1;
@@ -1005,7 +1021,7 @@ function plPlayerStats(){
  card('🏆 Average',row('Gesamt-AVG',formatAvg(cups,turns))+row('Höchster Winning-AVG',rec(bestWin))+row('Höchster Losing-AVG',rec(bestLoss)),true)+
  card('🎯 Wurfstatistik',row('Geworfene Bälle',x.shots)+row('Treffer',x.hits)+row('Trefferquote',formatPct(x.hits,x.shots))+row('Trickshot-Versuche',x.trickAttempts)+row('Trickshot-Trefferquote',formatPct(x.trickHits,x.trickAttempts)))+
  card('🏁 Finishstatistik',row('Finishversuche',x.finishAttempts)+row('Erfolgreiche Finishes',x.finishHits)+row('Finishquote',formatPct(x.finishHits,x.finishAttempts))+row('Normale Finishes',normalFinishes)+row('Kombifinishes',comboFinishes)+row('Bombenfinishes',bombFinishes))+
- card('💣 Spezialstatistik',row('Bomben',x.bombs)+row('Kombinationen',x.combos)+row('Island-Versuche',x.islandAttempts)+row('Island-Treffer',x.islandHits)+row('Island-Trefferquote',formatPct(x.islandHits,x.islandAttempts))+row('Becherdifferenz',diff))+achievementMarkup(plOnlineId(pid));
+ card('💣 Spezialstatistik',row('Bomben',x.bombs)+row('Kombinationen',x.combos)+row('Island-Versuche',x.islandAttempts)+row('Island-Treffer',x.islandHits)+row('Island-Trefferquote',formatPct(x.islandHits,x.islandAttempts))+row('Becherdifferenz',diff));
 }
 function standingsTable(rows,detailLeague=null){return `<style>
 /* PL tables have SIX columns, unlike the four-column player stats. */
