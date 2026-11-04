@@ -16,7 +16,7 @@ const formationPatterns={
   1:[[[0,0]]]
 };
 const variantNames={6:['Grosse Pyramide'],5:['Full House 1','Full House 2','Full House 3'],4:['Vagina'],3:['Kleine Pyramide'],2:['Paar 1','Paar 2','Paar 3']};
-let db=load(),view='home',match=null,ui={},pendingStart=null;
+let db=load(),view='home',match=null,ui={},pendingStart=null,completedMatchSummary=null;
 let selectedProfileId=null,profileZoom=false,profileStatusSaving=false,profileStatusEditor=false;
 let trickFlashTimer=null;
 let pantsFlashTimer=null;
@@ -89,7 +89,7 @@ window.addEventListener('popstate',()=>{
  }
  view=target?.ruefnerView||'home';selectedProfileId=target?.profileId||null;
  if(view==='playerStats'&&target?.playerStatsId)ui.playerStats=target.playerStatsId;
- if(!['home','profiles','profileDetail','training','friendship','league','stats','playerStats','plPlayerDetail','rules','game','history','firstThrow'].includes(view))view='home';
+ if(!['home','profiles','profileDetail','training','friendship','league','stats','playerStats','plPlayerDetail','rules','game','history','firstThrow','matchSummary'].includes(view))view='home';
  if(view==='game'&&!match)view='home';
  ui={};
  if(view==='plPlayerDetail'&&target?.plDetail)ui.plDetail=target.plDetail;
@@ -102,7 +102,7 @@ function header(){
  const account=onlineNavRole==='player'?'<a class="btn secondary" href="online.html?logout=1">🚪 Abmelden</a>':`<a class="btn secondary" href="online.html">${onlineNavRole==='admin'?'👑 Admin':'🔐 Online'}</a>`;
  return `<div class="top"><div class="brand" onclick="go('home')" style="cursor:pointer"><span class="brand-lines"><span class="brand-main">Rüfner</span><span class="brand-accent">Beer Pong</span></span></div><div class="top-actions">${btn('☰ Menü',"go('home')",'secondary')}${account}</div></div>`;
 }
-function render(){const root=document.getElementById('app');let body='';try{body=({home,profiles,profileDetail,training,friendship,league,stats,playerStats,plPlayerDetail:plPlayerStats,rules,game,history:historyPage,firstThrow})[view]?.()||home()}catch(e){body=`<div class="notice">Fehler: ${esc(e.message)}</div>${btn('Zurück',"go('home')")}`};root.innerHTML=`<div class="shell ${view==='game'?'shell-game':''}">${view==='game'?'':header()}${body}${view==='game'?'':'<footer>Rüfner Beer Pong</footer>'}</div>${appDialogMarkup()}${profileZoomMarkup()}${profileStatusEditorMarkup()}`}
+function render(){const root=document.getElementById('app');let body='';try{body=({home,profiles,profileDetail,training,friendship,league,stats,playerStats,plPlayerDetail:plPlayerStats,rules,game,history:historyPage,firstThrow,matchSummary:matchSummaryPage})[view]?.()||home()}catch(e){body=`<div class="notice">Fehler: ${esc(e.message)}</div>${btn('Zurück',"go('home')")}`};root.innerHTML=`<div class="shell ${view==='game'?'shell-game':''}">${view==='game'?'':header()}${body}${view==='game'?'':'<footer>Rüfner Beer Pong</footer>'}</div>${appDialogMarkup()}${profileZoomMarkup()}${profileStatusEditorMarkup()}`}
 let appDialog=null;
 function showAppAlert(message){appDialog={type:'alert',message:String(message)};render();}
 function showAppConfirm(message,onAccept){appDialog={type:'confirm',message:String(message),onAccept};render();}
@@ -173,7 +173,7 @@ async function photoProfile(e){
  }catch(err){showAppAlert('Profilbild konnte nicht online gespeichert werden: '+(err.message||err)+'\nBitte zuerst die beiliegende Supabase-SQL-Einrichtung ausführen.');}
 }
 function requireProfile(){if(!onlineUserId||!db.players.some(p=>p.id===db.current&&p.onlineId===onlineUserId)){go('profiles');return false}return true}
-function training(){return `<div class="section"><h2>🤖 Training</h2><p class="muted">Privat. Nur dein höchster besiegter Rüfner 3000 wird gespeichert.</p></div><div class="panel"><div class="field"><label>Schwierigkeit</label><select id="difficulty"><option value="0">Anfänger</option><option value="1">Amateur</option><option value="2">Fortgeschritten</option><option value="3">Profi</option><option value="4">Legende</option><option value="5">Unbesiegbar</option></select></div>${btn('Training starten','startTraining()')}</div>`}
+function training(){return `<div class="section"><h2>🤖 Training</h2><p class="muted">Privat. Nur dein höchster besiegter Rüfner 3000 wird gespeichert.</p></div><div class="panel"><div class="field"><label>Schwierigkeit</label><select id="difficulty"><option value="0">Anfänger</option><option value="1">Amateur</option><option value="2">Fortgeschritten</option><option value="3">Profi</option><option value="4">Legende</option><option value="5">Unbesiegbar</option></select></div><div class="field"><label>Becher zusammenstellen</label><select id="trainingRerack"><option value="no">Ohne Zusammenstellen (Standard)</option><option value="yes">Mit Zusammenstellen</option></select></div>${btn('Training starten','startTraining()')}</div>`}
 
 // Online-Spielerverzeichnis (V2.2): Nur für angemeldete Benutzer.
 // Spielstände bleiben in dieser Zwischenversion weiterhin lokal.
@@ -563,7 +563,7 @@ function friendship(){
  return `<div class="section"><h2>🏓 Freundschaftsspiel</h2></div><div class="panel">${onlineDirectoryLoading||onlineDirectoryError?`<p class="muted">${esc(onlineDirectoryLoading?'Online-Spieler werden geladen …':onlineDirectoryError)}</p>`:''}${pairPicker()}${btn('Spiel starten',"startFriendly()")}</div>`;
 }
 function pairPicker(ids){const ps=ids||db.players.filter(p=>!p.isDeleted).filter((p,i,arr)=>arr.findIndex(q=>q.name.toLocaleLowerCase('de')===p.name.toLocaleLowerCase('de'))===i).map(p=>p.id);return `<div class="field"><label style="color:#69baff;font-weight:800">Spieler 1</label><select id="p1">${ps.map(p=>`<option value="${p}">${esc(name(p))}</option>`).join('')}</select></div><div class="field"><label style="color:#ff788e;font-weight:800">Spieler 2</label><select id="p2">${ps.map((p,i)=>`<option value="${p}" ${i===1?'selected':''}>${esc(name(p))}</option>`).join('')}</select></div>`}
-function startTraining(){if(!requireProfile())return;startMatch(db.current,'COM','training',null,Number(document.getElementById('difficulty').value))}
+function startTraining(){if(!requireProfile())return;startMatch(db.current,'COM','training',null,Number(document.getElementById('difficulty').value),document.getElementById('trainingRerack').value==='yes')}
 function startFriendly(){if(db.players.length<2)return showAppAlert('Erstelle zuerst mindestens zwei Profile.');const a=document.getElementById('p1').value,b=document.getElementById('p2').value;if(a===b)return showAppAlert('Bitte zwei unterschiedliche Spieler wählen.');startMatch(a,b,'friendly')}
 function newSide(){return {achievementTurnHits:0,achievementTurnCups:0,achievementMaxTurn:0,achievementFirstTurn:0,achievementLastTurn:0,achievementReceivedSix:false,achievementSix:false,achievementMissStart:0,achievementColdStart:false,achievementPantsTurns:0,achievementPantsStartTurn:0,achievementPantsAward:false,achievementPantsActive:false,achievementFirstHitDone:false,achievementComboFinish:false,achievementFourFinish:false,achievementDeathCup:false,achievementOwnGoal:false,achievementComeback:false,turns:0,finishAttempts:0,finishHits:0,normalFinishes:0,comboFinishes:0,bombFinishes:0,trickAttempts:0,trickHits:0,islandAttempts:0,islandHits:0,cups:Array.from({length:10},(_,i)=>i),layout:10,positions:formationCoords(10,0),reracked:false,shots:0,hits:0,bombs:0,combos:0}}
 function formationCoords(n,v){
@@ -573,11 +573,11 @@ function formationCoords(n,v){
  // Hinterste Reihe immer am Tischende, unabhängig von der Becherzahl.
  return pattern.map(([r,c])=>({x:145+c*53,y:206-(maxRow-r)*46}));
 }
-function startMatch(a,b,kind,ref=null,difficulty=0){
+function startMatch(a,b,kind,ref=null,difficulty=0,trainingRerack=true){
  if(kind!=='training'){
   pendingStart={a,b,kind,ref,difficulty};view='firstThrow';render();return;
  }
- beginMatch(a,b,kind,ref,difficulty,0);
+ beginMatch(a,b,kind,ref,difficulty,0,trainingRerack);
 }
 function firstThrow(){
  if(!pendingStart)return `<div class="notice">Kein Spiel ausgewählt.</div>${btn('Zurück',"go('home')")}`;
@@ -593,8 +593,8 @@ function chooseFirstThrow(side){
   beginMatch(first,second,kind,ref,difficulty,0);
  }else beginMatch(a,b,kind,ref,difficulty,side);
 }
-function beginMatch(a,b,kind,ref,difficulty,firstTurn){
- match={id:id(),a,b,kind,ref,difficulty,sides:[newSide(),newSide()],turn:firstTurn,round:[],pending:null,bonus:false,comboActive:false,comboBonusThrows:0,tricks:0,bonusPhase:false,bonusType:null,awaitingTrick:false,finished:false,log:[],undo:[],pants:[{firstHit:false,down:false},{firstHit:false,down:false}]};
+function beginMatch(a,b,kind,ref,difficulty,firstTurn,trainingRerack=true){
+ match={id:id(),a,b,kind,ref,difficulty,trainingRerack,sides:[newSide(),newSide()],turn:firstTurn,round:[],pending:null,bonus:false,comboActive:false,comboBonusThrows:0,tricks:0,bonusPhase:false,bonusType:null,awaitingTrick:false,finished:false,log:[],undo:[],pants:[{firstHit:false,down:false},{firstHit:false,down:false}]};
  match.sides[firstTurn].turns=1;
  match.achievementTurnStart=[10,10];window.history.pushState({ruefnerView:'game'},'','#game');view='game';render();if(isComTurn())computerTurn();
 }
@@ -868,16 +868,16 @@ function computerTurn(){
  }else match.round.push({miss:true});
  if(match.round.length===2)resolveRound();else{render();setTimeout(computerTurn,550)}
 }
-function canComRerack(){if(!match||match.kind!=='training'||match.turn!==1||match.finished||match.pending||match.round.length||match.comboActive||match.comboBonusThrows>0||match.bonusPhase||match.awaitingTrick)return false;const s=match.sides[0];return !s.reracked&&s.cups.length>=2&&s.cups.length<=6}
-function canRerack(){if(match?.kind==='league')return false;if(!match||match.finished||match.pending||match.islandChoice||ui.islandActive||match.round.length!==0||match.comboActive||match.comboBonusThrows>0||match.bonusPhase||match.awaitingTrick||isComTurn())return false;const s=match.sides[boardIndex()];return !s.reracked&&s.cups.length>=2&&s.cups.length<=6}
-function showRerack(){if(match?.kind==='league'||!canRerack())return;ui.rerack=true;render()}
+function canComRerack(){if(!match||match.kind!=='training'||match.trainingRerack===false||match.turn!==1||match.finished||match.pending||match.round.length||match.comboActive||match.comboBonusThrows>0||match.bonusPhase||match.awaitingTrick)return false;const s=match.sides[0];return !s.reracked&&s.cups.length>=2&&s.cups.length<=6}
+function canRerack(){if(match?.kind==='league'||match?.kind==='training'&&match.trainingRerack===false)return false;if(!match||match.finished||match.pending||match.islandChoice||ui.islandActive||match.round.length!==0||match.comboActive||match.comboBonusThrows>0||match.bonusPhase||match.awaitingTrick||isComTurn())return false;const s=match.sides[boardIndex()];return !s.reracked&&s.cups.length>=2&&s.cups.length<=6}
+function showRerack(){if(match?.kind==='league'||match?.kind==='training'&&match.trainingRerack===false||!canRerack())return;ui.rerack=true;render()}
 function formationPreview(n,v,side){
  const coords=formationCoords(n,v);
  return `<svg viewBox="0 0 190 130" aria-hidden="true">${coords.map(q=>`<circle cx="${95+(q.x-145)*.8}" cy="${side===1?130-(13+(q.y-(206-3*46))*.68):13+(q.y-(206-3*46))*.68}" r="15" fill="${side===1?'#d64b52':'#377fe5'}" stroke="#f6f7fb" stroke-width="3"/>`).join('')}</svg>`;
 }
 function rerackPanel(){const side=boardIndex(),n=match.sides[side].cups.length;return `<div class="rerack-backdrop" onclick="if(event.target===this)closeRerack()"><div class="panel rerack-panel" role="dialog" aria-modal="true" aria-label="Formation auswählen"><h3>🔄 Formation auswählen</h3><div class="formation-grid">${(variantNames[n]||[]).map((_,i)=>`<button class="formation-choice" onclick="applyRerack(${side},${i},true)" aria-label="Formation ${i+1}">${formationPreview(n,i,side)}</button>`).join('')}</div>${btn('Abbrechen','closeRerack()','secondary')}</div></div>`}
 function closeRerack(){ui.rerack=false;render()}
-function applyRerack(side,v,redraw=true){if(match?.kind==='league')return;if(!match||side!==boardIndex())return;const s=match.sides[side],n=s.cups.length;if(s.reracked||n<2||n>6||match.round.length||(isComTurn()? !canComRerack():!canRerack()))return;const positions=formationCoords(n,v);s.positions={};s.cups.forEach((c,i)=>s.positions[c]=positions[i]);s.reracked=true;ui.rerack=false;if(redraw)render()}
+function applyRerack(side,v,redraw=true){if(match?.kind==='league'||match?.kind==='training'&&match.trainingRerack===false)return;if(!match||side!==boardIndex())return;const s=match.sides[side],n=s.cups.length;if(s.reracked||n<2||n>6||match.round.length||(isComTurn()? !canComRerack():!canRerack()))return;const positions=formationCoords(n,v);s.positions={};s.cups.forEach((c,i)=>s.positions[c]=positions[i]);s.reracked=true;ui.rerack=false;if(redraw)render()}
 function deathCup(){if(!match||match.kind==='training'||match.finished||match.pending)return;ui.deathCup=true;render()}
 function cancelDeathCup(){ui.deathCup=false;render()}
 function chooseDeathCupWinner(side){
@@ -912,7 +912,7 @@ async function finishMatch(){
   catch(e){cloudSaving=false;render();showAppAlert('Online-Speichern fehlgeschlagen: '+(e.message||'Unbekannter Fehler')+'\nDas Spiel ist noch offen. Bitte erneut versuchen.');return;}
   cloudSaving=false;
  }
- if(g.kind==='league'){match=null;go('league');return;}
+ if(g.kind==='league'){completedMatchSummary=g;match=null;go('matchSummary');return;}
  if(g.kind==='training'){
   db.trainingAchievements=db.trainingAchievements||{};
   const t=db.trainingAchievements[match.a]||(db.trainingAchievements[match.a]={played:false,unbeatable:false});
@@ -939,7 +939,28 @@ async function finishMatch(){
    }
   }
  }
- save();match=null;go(g.kind==='training'?'home':g.kind==='league'?'league':'stats');
+ save();completedMatchSummary=g;match=null;go('matchSummary');
+}
+function closeMatchSummary(){const kind=completedMatchSummary?.kind;completedMatchSummary=null;go(kind==='training'?'home':kind==='league'?'league':'stats')}
+function matchSummaryPage(){
+ const g=completedMatchSummary;if(!g)return `<div class="panel">Keine Spielzusammenfassung vorhanden.</div>${btn('Zum Menü',"go('home')")}`;
+ const a=g.sides[0],b=g.sides[1];
+ const avg=(s,opp)=>s.turns>0?((10-Number(opp.remaining||0))/s.turns).toFixed(2):'–';
+ const val=(s,k)=>Number(s[k]||0);
+ const rows=[
+ ['AVG',avg(a,b),avg(b,a)],['Geworfene Bälle',val(a,'shots'),val(b,'shots')],['Treffer',val(a,'hits'),val(b,'hits')],
+ ['Trefferquote',formatPct(a.hits,a.shots),formatPct(b.hits,b.shots)],
+ ['Trickshot-Versuche',val(a,'trickAttempts'),val(b,'trickAttempts')],['Trickshot-Treffer',val(a,'trickHits'),val(b,'trickHits')],
+ ['Trickshot-Trefferquote',formatPct(a.trickHits,a.trickAttempts),formatPct(b.trickHits,b.trickAttempts)],
+ ['Finishversuche',val(a,'finishAttempts'),val(b,'finishAttempts')],['Erfolgreiche Finishes',val(a,'finishHits'),val(b,'finishHits')],
+ ['Finishquote',formatPct(a.finishHits,a.finishAttempts),formatPct(b.finishHits,b.finishAttempts)],
+ ['Normale Finishes',val(a,'normalFinishes'),val(b,'normalFinishes')],['Kombifinishes',val(a,'comboFinishes'),val(b,'comboFinishes')],['Bombenfinishes',val(a,'bombFinishes'),val(b,'bombFinishes')],
+ ['Bomben',val(a,'bombs'),val(b,'bombs')],['Kombinationen',val(a,'combos'),val(b,'combos')],
+ ['Island-Versuche',val(a,'islandAttempts'),val(b,'islandAttempts')],['Island-Treffer',val(a,'islandHits'),val(b,'islandHits')],
+ ['Island-Trefferquote',formatPct(a.islandHits,a.islandAttempts),formatPct(b.islandHits,b.islandAttempts)],
+ ['Becherdifferenz',Number(a.remaining||0)-Number(b.remaining||0),Number(b.remaining||0)-Number(a.remaining||0)]
+ ];
+ return `<div class="section"><h2>📊 Match-Statistik</h2><p class="muted">🏆 ${esc(name(g.winner))} hat gewonnen!</p></div><div class="panel"><div class="table-wrap"><table class="table" style="width:100%;table-layout:fixed;text-align:center"><thead><tr><th style="width:30%;overflow-wrap:anywhere">${avatar(g.a)} ${esc(name(g.a))}</th><th style="width:40%">Statistik</th><th style="width:30%;overflow-wrap:anywhere">${avatar(g.b)} ${esc(name(g.b))}</th></tr></thead><tbody>${rows.map(([label,x,y])=>`<tr><td><strong>${esc(x)}</strong></td><td style="font-size:.85em">${esc(label)}</td><td><strong>${esc(y)}</strong></td></tr>`).join('')}</tbody></table></div></div><div style="margin:20px 0;text-align:center">${btn('✓ Statistik schliessen','closeMatchSummary()')}</div>`;
 }
 function league(){if(!plLoaded&&!plLoading&&!plError)setTimeout(()=>loadPlOnline(),0);const l=db.leagues.filter(x=>x.online).find(x=>!x.closed);return (plError?`<div class="notice">Online-Fehler: ${esc(plError)} ${btn('Erneut versuchen','refreshPlOnline()','secondary')}</div>`:plLoading?'<p class="muted">Premier League wird geladen …</p>':'')+ `<div class="section row between"><h2>🏆 Premier League</h2></div>${!l?`<div class="panel"><h3>Keine aktive Saison</h3><p class="muted">15 Nights und Finalabend.</p>${onlineNavRole==='admin'?btn('Saison erstellen','createLeagueForm()'):''}</div>`:leagueDetail(l)}<div class="section"><h2>Saisonarchiv</h2></div>${db.leagues.filter(x=>x.online&&x.closed).map(x=>`<div class="panel"><strong>${esc(x.title)}</strong> ${btn('Ansehen',`showArchived('${x.id}')`,'secondary')}</div>`).join('')||'<p class="muted">Noch keine abgeschlossenen Saisons.</p>'}`}
 function createLeagueForm(){if(onlineNavRole!=='admin')return showAppAlert('Nur der Administrator kann eine Saison erstellen.');if(db.leagues.some(l=>l.online&&!l.closed))return showAppAlert('Es läuft bereits eine Saison.');renderLeagueForm()}
