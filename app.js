@@ -565,7 +565,7 @@ function friendship(){
 function pairPicker(ids){const ps=ids||db.players.filter(p=>!p.isDeleted).filter((p,i,arr)=>arr.findIndex(q=>q.name.toLocaleLowerCase('de')===p.name.toLocaleLowerCase('de'))===i).map(p=>p.id);return `<div class="field"><label style="color:#69baff;font-weight:800">Spieler 1</label><select id="p1">${ps.map(p=>`<option value="${p}">${esc(name(p))}</option>`).join('')}</select></div><div class="field"><label style="color:#ff788e;font-weight:800">Spieler 2</label><select id="p2">${ps.map((p,i)=>`<option value="${p}" ${i===1?'selected':''}>${esc(name(p))}</option>`).join('')}</select></div>`}
 function startTraining(){if(!requireProfile())return;startMatch(db.current,'COM','training',null,Number(document.getElementById('difficulty').value),document.getElementById('trainingRerack').value==='yes')}
 function startFriendly(){if(db.players.length<2)return showAppAlert('Erstelle zuerst mindestens zwei Profile.');const a=document.getElementById('p1').value,b=document.getElementById('p2').value;if(a===b)return showAppAlert('Bitte zwei unterschiedliche Spieler wählen.');startMatch(a,b,'friendly')}
-function newSide(){return {achievementTurnHits:0,achievementTurnCups:0,achievementMaxTurn:0,achievementFirstTurn:0,achievementLastTurn:0,achievementReceivedSix:false,achievementSix:false,achievementMissStart:0,achievementColdStart:false,achievementPantsTurns:0,achievementPantsStartTurn:0,achievementPantsAward:false,achievementPantsActive:false,achievementFirstHitDone:false,achievementComboFinish:false,achievementFourFinish:false,achievementDeathCup:false,achievementOwnGoal:false,achievementComeback:false,turns:0,finishAttempts:0,finishHits:0,normalFinishes:0,comboFinishes:0,bombFinishes:0,trickAttempts:0,trickHits:0,islandAttempts:0,islandHits:0,cups:Array.from({length:10},(_,i)=>i),layout:10,positions:formationCoords(10,0),reracked:false,shots:0,hits:0,bombs:0,combos:0}}
+function newSide(){return {achievementTurnHits:0,achievementTurnCups:0,achievementTurnBombFinishes:0,achievementMaxTurn:0,achievementFirstTurn:0,achievementLastTurn:0,achievementReceivedSix:false,achievementSix:false,achievementMissStart:0,achievementColdStart:false,achievementPantsTurns:0,achievementPantsStartTurn:0,achievementPantsAward:false,achievementPantsActive:false,achievementFirstHitDone:false,achievementComboFinish:false,achievementFourFinish:false,achievementDeathCup:false,achievementOwnGoal:false,achievementComeback:false,turns:0,finishAttempts:0,finishHits:0,normalFinishes:0,comboFinishes:0,bombFinishes:0,trickAttempts:0,trickHits:0,islandAttempts:0,islandHits:0,cups:Array.from({length:10},(_,i)=>i),layout:10,positions:formationCoords(10,0),reracked:false,shots:0,hits:0,bombs:0,combos:0}}
 function formationCoords(n,v){
  const pattern=(formationPatterns[n]||formationPatterns[10])[v]||(formationPatterns[n]||formationPatterns[10])[0];
  const maxRow=Math.max(...pattern.map(([r])=>r));
@@ -676,7 +676,7 @@ function finishRegularThrows(){
  const target=boardIndex(),remaining=match.sides[target].cups.length;
  if(hits.length===2&&hits[0].cup===hits[1].cup&&remaining<=4+islandHits){
   const own=match.sides[match.turn];
-  own.bombs++;own.finishAttempts++;own.finishHits++;own.bombFinishes++;
+  own.bombs++;own.finishAttempts++;own.finishHits++;own.bombFinishes++;own.achievementTurnBombFinishes=(own.achievementTurnBombFinishes||0)+1;
   removeCups(target,[...match.sides[target].cups]);
   checkWin();
   return;
@@ -793,8 +793,8 @@ function missShot(){
  if(match.comboBonusThrows>0)match.comboBonusThrows--;match.round.push({miss:true,island});
  if(match.round.length===2)finishRegularThrows();else render();
 }
-function resolveRound(){const r=match.round,side=boardIndex(),own=match.sides[match.turn];if(r.length!==2)return;const hits=r.filter(q=>q.cup!==undefined);if(hits.length===2&&hits[0].cup===hits[1].cup){own.bombs++;if(match.sides[side].cups.length<=4){own.finishAttempts++;own.finishHits++;own.bombFinishes++;
-  if(match.sides[side].cups.length===4&&match.achievementTurnStart[match.turn]===4)own.achievementFourFinish=true;
+function resolveRound(){const r=match.round,side=boardIndex(),own=match.sides[match.turn];if(r.length!==2)return;const hits=r.filter(q=>q.cup!==undefined);if(hits.length===2&&hits[0].cup===hits[1].cup){own.bombs++;if(match.sides[side].cups.length<=4){own.finishAttempts++;own.finishHits++;own.bombFinishes++;own.achievementTurnBombFinishes=(own.achievementTurnBombFinishes||0)+1;
+  if(match.sides[side].cups.length===4&&match.achievementTurnStart[match.turn]===4)own.achievementFourFinish=true; // Genau vier Becher zu Beginn und beim Bombentreffer
  }const c=hits[0].cup,origin=match.sides[side].positions[c];removeCups(side,[c]);if(match.sides[side].cups.length<=3){removeCups(side,[...match.sides[side].cups]);afterBomb();return}const remaining=3;if(remaining){match.pending={side,origin,remaining,allowed:[]};settleBomb();if(match.pending&&match.kind==='training'&&side===1){autoBomb();return}render();return}afterBomb();return}if(hits.length===2){own.combos++;if(match.sides[side].cups.length===2){own.finishAttempts++;own.finishHits++;own.comboFinishes++;
   if(match.achievementTurnStart[match.turn]===2&&!match.comboActive&&!match.comboBonusThrows)own.achievementComboFinish=true;
  }match.comboActive=true;match.comboBonusThrows=2;ui.rerack=false;removeCups(side,hits.map(q=>q.cup));match.round=[];if(checkWin())return;render();if(isComTurn())setTimeout(computerTurn,300);return}if(hits.length)removeCups(side,[hits[0].cup]);afterNormalRound()}
@@ -806,6 +806,20 @@ function afterNormalRound(){
 }
 function checkWin(){
  if(match.sides[0].cups.length&&match.sides[1].cups.length)return false;
+ // Sicherheitsprüfung für den Vierer-Todesstoss: Eine Bombe beendet eine
+ // Aufnahme, die mit genau vier gegnerischen Bechern begonnen hat.
+ // Die Prüfung erfolgt vor dem Zurücksetzen des Zugzustands und bleibt
+ // auch bei den unterschiedlichen Bomben-Auswahlpfaden zuverlässig.
+ const winningSide=match.turn;
+ const attacker=match.sides[winningSide];
+ const defender=match.sides[1-winningSide];
+ if(defender.cups.length===0 &&
+    match.achievementTurnStart?.[winningSide]===4 &&
+    attacker.achievementTurnCups===4 &&
+    attacker.achievementTurnBombFinishes>0){
+   attacker.achievementFourFinish=true;
+ }
+
  ui.trickFlash=null;clearTimeout(trickFlashTimer);match.finished=true;match.winner=match.sides[0].cups.length===0&&match.sides[1].cups.length===0?[match.a,match.b][match.turn]:(match.sides[0].cups.length===0?match.b:match.a);
  match.round=[];match.pending=null;match.islandChoice=null;match.islandQueue=[];ui.islandActive=false;match.bonus=false;match.tricks=0;match.bonusPhase=false;match.awaitingTrick=false;
  render();return true;
@@ -819,7 +833,7 @@ function endRound(){
   ended.achievementPantsTurns=(ended.achievementPantsTurns||0)+1;
   if(ended.achievementPantsTurns>=3)ended.achievementPantsAward=true;
  }
- ended.achievementTurnCups=0;ended.achievementTurnHits=0;
+ ended.achievementTurnCups=0;ended.achievementTurnHits=0;ended.achievementTurnBombFinishes=0;
  match.turn=1-match.turn;match.sides[match.turn].turns++;
  match.achievementTurnStart[match.turn]=match.sides[1-match.turn].cups.length;
  match.comboActive=false;match.comboBonusThrows=0;ui.rerack=false;render();
