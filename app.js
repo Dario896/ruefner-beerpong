@@ -426,7 +426,7 @@ const ACHIEVEMENTS=[
  ['🏝️','Island','Mindestens 2 erfolgreiche Islander in einem Spiel'],
  ['👖','Pants Down','Nach Pants Down 3 folgende eigene Aufnahmen ohne Treffer'],
  ['🍺','Durstiger','Mindestens 6 Becher in einer gegnerischen Aufnahme kassieren'],
- ['🪓','Abrissbirne','Mindestens 6 gegnerische Becher in einer Aufnahme entfernen'],
+ ['☢️','Nuklearschlag','Mindestens 6 gegnerische Becher in einer Aufnahme entfernen'],
  ['🍀','Pechvogel','Ein Eigentor verursachen'],
  ['☠️','Death Cup','Mit einem Death Cup gewinnen'],
  ['🎳','Finisher','Den letzten Becher beim ersten Finishversuch treffen'],
@@ -440,13 +440,20 @@ const ACHIEVEMENTS=[
  ['🗡️','Doppelter Todesstoss','Triff die letzten 2 Becher mit deinen beiden Würfen.'],
  ['⚰️','Vierer-Todesstoss','Entferne die letzten 4 Becher mit einer Bombe.'],
  ['🪑','King of the Table','Drei Spiele hintereinander im King-of-the-Table-Modus gewinnen (in einem späteren Update verfügbar)'],
- ['🔗','Kombinationskönig','Mindestens 2 echte Kombinationen in einem Spiel erzielen, auch in derselben Aufnahme. Trickshots zählen nicht.']
+ ['🔗','Kombinationskönig','Mindestens 2 echte Kombinationen in einem Spiel erzielen, auch in derselben Aufnahme. Trickshots zählen nicht.'],
+ ['🦆','Gummiente','Verfehle 15 Würfe hintereinander.'],
+ ['💀','Hinrichtung','Gewinne ein Spiel, während dein Gegner noch mindestens 8 Becher hat.'],
+ ['🫠','Komplettversagen','Verliere 5 Spiele hintereinander.'],
+ ['🪦','Grabstein','Verliere ein Spiel, ohne einen einzigen Becher zu treffen.'],
+ ['🤡','Clown des Abends','Verliere 3 Spiele hintereinander mit jeweils unter 20 % Trefferquote.'],
+ ['🚑','Intensivstation','Verliere ein Spiel nach mindestens 10 vergebenen Matchbällen.'],
+ ['🪣','Eimerweise daneben','Verfehle mindestens 50 Würfe in einem Spiel.']
 ];
 function achievementRowsFor(pid){
  const p=db.players.find(p=>p.onlineId===pid),records=allOnlineStatResults()
   .filter(g=>g.player_a===pid||g.player_b===pid)
   .sort((a,b)=>new Date(a.played_at)-new Date(b.played_at));
- const got=new Set();let streak=0,coldStreak=0;
+ const got=new Set();let streak=0,coldStreak=0,lossStreak=0,clownStreak=0;
  for(const g of records){
   const isA=g.player_a===pid,s=isA?g.side_a:g.side_b,o=isA?g.side_b:g.side_a;
   if(!s||!o)continue;
@@ -478,6 +485,13 @@ function achievementRowsFor(pid){
   // Bereits gespeicherte Kombinationen werden auch rückwirkend ausgewertet.
   // Die Spiellogik zählt nur zwei Treffer auf unterschiedliche Becher als Kombination.
   add(31,Number(s.combos)>=2);
+  add(32,s.achievementMissStreak15===true);
+  add(33,win&&Number(o.remaining)>=8);
+  add(35,!win&&hits===0&&shots>0);
+  add(37,!win&&Number(s.achievementMissedMatchballs)>=10);
+  add(38,shots-hits>=50);
+  lossStreak=!win?lossStreak+1:0;if(lossStreak>=5)got.add(34);
+  clownStreak=!win&&shots>0&&hits/shots<.2?clownStreak+1:0;if(clownStreak>=3)got.add(36);
   streak=win?streak+1:0;if(streak>=5)got.add(2);
   coldStreak=win&&Number(s.bombs)===0?coldStreak+1:0;if(coldStreak>=3)got.add(8);
  }
@@ -565,7 +579,7 @@ function friendship(){
 function pairPicker(ids){const ps=ids||db.players.filter(p=>!p.isDeleted).filter((p,i,arr)=>arr.findIndex(q=>q.name.toLocaleLowerCase('de')===p.name.toLocaleLowerCase('de'))===i).map(p=>p.id);return `<div class="field"><label style="color:#69baff;font-weight:800">Spieler 1</label><select id="p1">${ps.map(p=>`<option value="${p}">${esc(name(p))}</option>`).join('')}</select></div><div class="field"><label style="color:#ff788e;font-weight:800">Spieler 2</label><select id="p2">${ps.map((p,i)=>`<option value="${p}" ${i===1?'selected':''}>${esc(name(p))}</option>`).join('')}</select></div>`}
 function startTraining(){if(!requireProfile())return;startMatch(db.current,'COM','training',null,Number(document.getElementById('difficulty').value),document.getElementById('trainingRerack').value==='yes')}
 function startFriendly(){if(db.players.length<2)return showAppAlert('Erstelle zuerst mindestens zwei Profile.');const a=document.getElementById('p1').value,b=document.getElementById('p2').value;if(a===b)return showAppAlert('Bitte zwei unterschiedliche Spieler wählen.');startMatch(a,b,'friendly')}
-function newSide(){return {achievementTurnHits:0,achievementTurnCups:0,achievementTurnBombFinishes:0,achievementMaxTurn:0,achievementFirstTurn:0,achievementLastTurn:0,achievementReceivedSix:false,achievementSix:false,achievementMissStart:0,achievementColdStart:false,achievementPantsTurns:0,achievementPantsStartTurn:0,achievementPantsAward:false,achievementPantsActive:false,achievementFirstHitDone:false,achievementComboFinish:false,achievementFourFinish:false,achievementDeathCup:false,achievementOwnGoal:false,achievementComeback:false,turns:0,finishAttempts:0,finishHits:0,normalFinishes:0,comboFinishes:0,bombFinishes:0,trickAttempts:0,trickHits:0,islandAttempts:0,islandHits:0,cups:Array.from({length:10},(_,i)=>i),layout:10,positions:formationCoords(10,0),reracked:false,shots:0,hits:0,bombs:0,combos:0}}
+function newSide(){return {achievementConsecutiveMisses:0,achievementMissStreak15:false,achievementMissedMatchballs:0,achievementTurnHits:0,achievementTurnCups:0,achievementTurnBombFinishes:0,achievementMaxTurn:0,achievementFirstTurn:0,achievementLastTurn:0,achievementReceivedSix:false,achievementSix:false,achievementMissStart:0,achievementColdStart:false,achievementPantsTurns:0,achievementPantsStartTurn:0,achievementPantsAward:false,achievementPantsActive:false,achievementFirstHitDone:false,achievementComboFinish:false,achievementFourFinish:false,achievementDeathCup:false,achievementOwnGoal:false,achievementComeback:false,turns:0,finishAttempts:0,finishHits:0,normalFinishes:0,comboFinishes:0,bombFinishes:0,trickAttempts:0,trickHits:0,islandAttempts:0,islandHits:0,cups:Array.from({length:10},(_,i)=>i),layout:10,positions:formationCoords(10,0),reracked:false,shots:0,hits:0,bombs:0,combos:0}}
 function formationCoords(n,v){
  const pattern=(formationPatterns[n]||formationPatterns[10])[v]||(formationPatterns[n]||formationPatterns[10])[0];
  const maxRow=Math.max(...pattern.map(([r])=>r));
@@ -771,7 +785,7 @@ function tapCup(side,c){
  snapshot();recordPantsHit(side,c);recordHit(side,c);
 }
 function recordHit(side,c){
- const own=match.sides[match.turn];own.achievementTurnHits=(own.achievementTurnHits||0)+1;const lastCup=match.sides[side].cups.length===1;const firstRegular=match.round.length===0&&!match.bonusPhase&&!match.comboActive&&!match.comboBonusThrows;own.shots++;own.hits++;if(ui.islandActive){own.islandAttempts++;own.islandHits++;}if(lastCup){own.finishAttempts++;own.finishHits++;own.normalFinishes++;if(firstRegular)match.halfTurnWinner=match.turn;}if(match.bonusPhase){own.trickAttempts++;own.trickHits++;}
+ const own=match.sides[match.turn];own.achievementConsecutiveMisses=0;own.achievementTurnHits=(own.achievementTurnHits||0)+1;const lastCup=match.sides[side].cups.length===1;const firstRegular=match.round.length===0&&!match.bonusPhase&&!match.comboActive&&!match.comboBonusThrows;own.shots++;own.hits++;if(ui.islandActive){own.islandAttempts++;own.islandHits++;}if(lastCup){own.finishAttempts++;own.finishHits++;own.normalFinishes++;if(firstRegular)match.halfTurnWinner=match.turn;}if(match.bonusPhase){own.trickAttempts++;own.trickHits++;}
  if(match.bonusPhase){removeCups(side,[c]);finishTrick();return}
  const island=!!ui.islandActive;ui.islandActive=false;
  if(match.comboBonusThrows>0)match.comboBonusThrows--;match.round.push({side,cup:c,island});
@@ -789,6 +803,14 @@ function missShot(){
  if(ui.pantsFlash)return;
  if(!match||match.finished||match.pending||match.islandChoice||isComTurn()||match.awaitingTrick)return;
  snapshot();
+ const thrower=match.sides[match.turn],target=match.sides[boardIndex()];
+ const previousHit=match.round.length===1&&match.round[0].cup!==undefined;
+ // Direct finish at one cup, or decisive second throw after first hit
+ // (bomb with 2–4 cups, or combo with 2 cups). Count each miss only once.
+ if(target.cups.length===1 || (target.cups.length>=2&&target.cups.length<=4&&previousHit))
+  thrower.achievementMissedMatchballs++;
+ thrower.achievementConsecutiveMisses=(thrower.achievementConsecutiveMisses||0)+1;
+ if(thrower.achievementConsecutiveMisses>=15)thrower.achievementMissStreak15=true;
  if(!match.sides[match.turn].achievementFirstHitDone){
   match.sides[match.turn].achievementMissStart++;
   if(match.sides[match.turn].achievementMissStart>=8)match.sides[match.turn].achievementColdStart=true;
@@ -923,7 +945,8 @@ async function finishMatch(){
   achievementSix:s.achievementSix,achievementColdStart:s.achievementColdStart,
   achievementPantsAward:s.achievementPantsAward,achievementComboFinish:s.achievementComboFinish,
   achievementFourFinish:s.achievementFourFinish,achievementDeathCup:s.achievementDeathCup,
-  achievementOwnGoal:s.achievementOwnGoal,achievementComeback:s.achievementComeback,reracked:s.reracked,
+  achievementOwnGoal:s.achievementOwnGoal,achievementComeback:s.achievementComeback,
+  achievementMissStreak15:s.achievementMissStreak15,achievementMissedMatchballs:s.achievementMissedMatchballs,reracked:s.reracked,
   achievementFirstHitDone:s.achievementFirstHitDone,
   achievementOpeningOpponentThrows:match.sides[1-i].shots===0}))};
  if(g.kind==='friendly'||g.kind==='league'){
