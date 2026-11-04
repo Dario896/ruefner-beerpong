@@ -677,6 +677,12 @@ function finishRegularThrows(){
  if(hits.length===2&&hits[0].cup===hits[1].cup&&remaining<=4+islandHits){
   const own=match.sides[match.turn];
   own.bombs++;own.finishAttempts++;own.finishHits++;own.bombFinishes++;own.achievementTurnBombFinishes=(own.achievementTurnBombFinishes||0)+1;
+  // Direkter Bombenfinish: vier Becher zu Beginn der aktuellen Aufnahme,
+  // vier durch diese Bombe entfernt. Vor removeCups/checkWin markieren.
+  if(remaining===4 && match.achievementTurnStart?.[match.turn]===4 &&
+     (own.achievementTurnCups||0)===0 && islandHits===0){
+    own.achievementFourFinish=true;
+  }
   removeCups(target,[...match.sides[target].cups]);
   checkWin();
   return;
