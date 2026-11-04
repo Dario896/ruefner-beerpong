@@ -413,7 +413,7 @@ const ACHIEVEMENTS=[
  ['💣','Bombenleger','Mindestens 2 Bomben in einem Spiel'],
  ['🔥','Unaufhaltsam','5 Spiele hintereinander gewinnen'],
  ['🏆','Legende','Eine Premier-League-Saison gewinnen'],
- ['🧱','Maurermeister','Mit weniger als 10 % Trefferquote gewinnen'],
+ ['🧑‍🦯','Blindgänger','Beende ein Spiel mit weniger als 10 % Trefferquote.'],
  ['🧹','Whitewash','Gewinnen, ohne einen eigenen Becher zu verlieren'],
  ['🧟','Totgeglaubte leben länger','Gewinnen, nachdem der Gegner nur noch einen und du mindestens fünf Becher hattest'],
  ['🚀','Blitzkrieg','In maximal 5 eigenen Aufnahmen gewinnen'],
@@ -437,8 +437,8 @@ const ACHIEVEMENTS=[
  ['⚡','Perfekter Start','Mindestens 5 Becher in der ersten eigenen Aufnahme entfernen'],
  ['🏁','Perfektes Ende','In der letzten Aufnahme mindestens 5 Becher entfernen und gewinnen'],
  ['🦾','Bezwinger des Unbesiegbaren','Rüfner 3000 auf Unbesiegbar besiegen'],
- ['🗡️','Doppelter Todesstoss','Aufnahme mit 2 Bechern beginnen und mit beiden regulären Würfen finishen'],
- ['⚰️','Vierer-Todesstoss','Aufnahme mit 4 Bechern beginnen und mit einer Bombe alle vier entfernen'],
+ ['🗡️','Doppelter Todesstoss','Triff die letzten 2 Becher mit deinen beiden Würfen.'],
+ ['⚰️','Vierer-Todesstoss','Entferne die letzten 4 Becher mit einer Bombe.'],
  ['🪑','King of the Table','Drei Spiele hintereinander im King-of-the-Table-Modus gewinnen (in einem späteren Update verfügbar)'],
  ['🔗','Kombinationskönig','Mindestens 2 echte Kombinationen in einem Spiel erzielen, auch in derselben Aufnahme. Trickshots zählen nicht.']
 ];
@@ -454,7 +454,7 @@ function achievementRowsFor(pid){
   const add=(n,ok)=>{if(ok)got.add(n)};
   add(0,win&&shots>0&&hits/shots>=.5);
   add(1,Number(s.bombs)>=2);
-  add(4,win&&shots>0&&hits/shots<.1);
+  add(4,shots>0&&hits/shots<.1);
   add(5,win&&Number(s.remaining)===10);
   add(6,win&&s.achievementComeback===true);
   add(7,win&&Number(s.turns)>0&&Number(s.turns)<=5);
