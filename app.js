@@ -173,7 +173,7 @@ async function photoProfile(e){
  }catch(err){showAppAlert('Profilbild konnte nicht online gespeichert werden: '+(err.message||err)+'\nBitte zuerst die beiliegende Supabase-SQL-Einrichtung ausführen.');}
 }
 function requireProfile(){if(!onlineUserId||!db.players.some(p=>p.id===db.current&&p.onlineId===onlineUserId)){go('profiles');return false}return true}
-function training(){return `<div class="section"><h2>🤖 Training</h2><p class="muted">Privat. Nur dein höchster besiegter Rüfner 3000 wird gespeichert.</p></div><div class="panel"><div class="field"><label>Schwierigkeit</label><select id="difficulty"><option value="0">Anfänger</option><option value="1">Amateur</option><option value="2">Fortgeschritten</option><option value="3">Profi</option><option value="4">Legende</option><option value="5">Unbesiegbar</option></select></div><div class="field"><label>Becher zusammenstellen</label><select id="trainingRerack"><option value="no">Ohne Zusammenstellen (Standard)</option><option value="yes">Mit Zusammenstellen</option></select></div>${btn('Training starten','startTraining()')}</div>`}
+function training(){return `<div class="section"><h2>🤖 Training</h2><p class="muted">Privat. Nur dein höchster besiegter Rüfner 3000 wird gespeichert.</p></div><div class="panel"><div class="field"><label>Schwierigkeit</label><select id="difficulty"><option value="0">Anfänger</option><option value="1">Amateur</option><option value="2">Fortgeschritten</option><option value="3">Profi</option><option value="4">Legende</option><option value="5">Unbesiegbar</option></select></div><div class="field"><label>Becher zusammenstellen</label><select id="trainingRerack"><option value="no">Ohne Zusammenstellen</option><option value="yes">Mit Zusammenstellen</option></select></div>${btn('Training starten','startTraining()')}</div>`}
 
 // Online-Spielerverzeichnis (V2.2): Nur für angemeldete Benutzer.
 // Spielstände bleiben in dieser Zwischenversion weiterhin lokal.
@@ -950,17 +950,19 @@ function matchSummaryPage(){
  const rows=[
  ['AVG',avg(a,b),avg(b,a)],['Geworfene Bälle',val(a,'shots'),val(b,'shots')],['Treffer',val(a,'hits'),val(b,'hits')],
  ['Trefferquote',formatPct(a.hits,a.shots),formatPct(b.hits,b.shots)],
+ ...(val(a,'trickAttempts')+val(b,'trickAttempts')>0?[
  ['Trickshot-Versuche',val(a,'trickAttempts'),val(b,'trickAttempts')],['Trickshot-Treffer',val(a,'trickHits'),val(b,'trickHits')],
- ['Trickshot-Trefferquote',formatPct(a.trickHits,a.trickAttempts),formatPct(b.trickHits,b.trickAttempts)],
+ ['Trickshot-Trefferquote',formatPct(a.trickHits,a.trickAttempts),formatPct(b.trickHits,b.trickAttempts)]]:[]),
  ['Finishversuche',val(a,'finishAttempts'),val(b,'finishAttempts')],['Erfolgreiche Finishes',val(a,'finishHits'),val(b,'finishHits')],
  ['Finishquote',formatPct(a.finishHits,a.finishAttempts),formatPct(b.finishHits,b.finishAttempts)],
  ['Normale Finishes',val(a,'normalFinishes'),val(b,'normalFinishes')],['Kombifinishes',val(a,'comboFinishes'),val(b,'comboFinishes')],['Bombenfinishes',val(a,'bombFinishes'),val(b,'bombFinishes')],
  ['Bomben',val(a,'bombs'),val(b,'bombs')],['Kombinationen',val(a,'combos'),val(b,'combos')],
+ ...(val(a,'islandAttempts')+val(b,'islandAttempts')>0?[
  ['Island-Versuche',val(a,'islandAttempts'),val(b,'islandAttempts')],['Island-Treffer',val(a,'islandHits'),val(b,'islandHits')],
- ['Island-Trefferquote',formatPct(a.islandHits,a.islandAttempts),formatPct(b.islandHits,b.islandAttempts)],
- ['Becherdifferenz',Number(a.remaining||0)-Number(b.remaining||0),Number(b.remaining||0)-Number(a.remaining||0)]
+ ['Island-Trefferquote',formatPct(a.islandHits,a.islandAttempts),formatPct(b.islandHits,b.islandAttempts)]]:[])
  ];
- return `<div class="section"><h2>📊 Match-Statistik</h2><p class="muted">🏆 ${esc(name(g.winner))} hat gewonnen!</p></div><div class="panel"><div class="table-wrap"><table class="table" style="width:100%;table-layout:fixed;text-align:center"><thead><tr><th style="width:30%;overflow-wrap:anywhere">${avatar(g.a)} ${esc(name(g.a))}</th><th style="width:40%">Statistik</th><th style="width:30%;overflow-wrap:anywhere">${avatar(g.b)} ${esc(name(g.b))}</th></tr></thead><tbody>${rows.map(([label,x,y])=>`<tr><td><strong>${esc(x)}</strong></td><td style="font-size:.85em">${esc(label)}</td><td><strong>${esc(y)}</strong></td></tr>`).join('')}</tbody></table></div></div><div style="margin:20px 0;text-align:center">${btn('✓ Statistik schliessen','closeMatchSummary()')}</div>`;
+ const scoreA=Number(a.remaining||0),scoreB=Number(b.remaining||0);
+ return `<div class="section"><h2>📊 Match-Statistik</h2><p class="muted">🏆 ${esc(name(g.winner))} hat gewonnen!</p></div><div class="panel"><div class="table-wrap"><table class="table" style="width:100%;table-layout:fixed;text-align:center"><thead><tr><th style="width:30%;overflow-wrap:anywhere">${avatar(g.a)} ${esc(name(g.a))}</th><th style="width:40%;font-size:1.5em;white-space:nowrap">${scoreA} : ${scoreB}</th><th style="width:30%;overflow-wrap:anywhere">${avatar(g.b)} ${esc(name(g.b))}</th></tr></thead><tbody>${rows.map(([label,x,y])=>`<tr><td><strong>${esc(x)}</strong></td><td style="font-size:.85em">${esc(label)}</td><td><strong>${esc(y)}</strong></td></tr>`).join('')}</tbody></table></div></div><div style="margin:20px 0;text-align:center">${btn('✓ Statistik schliessen','closeMatchSummary()')}</div>`;
 }
 function league(){if(!plLoaded&&!plLoading&&!plError)setTimeout(()=>loadPlOnline(),0);const l=db.leagues.filter(x=>x.online).find(x=>!x.closed);return (plError?`<div class="notice">Online-Fehler: ${esc(plError)} ${btn('Erneut versuchen','refreshPlOnline()','secondary')}</div>`:plLoading?'<p class="muted">Premier League wird geladen …</p>':'')+ `<div class="section row between"><h2>🏆 Premier League</h2></div>${!l?`<div class="panel"><h3>Keine aktive Saison</h3><p class="muted">15 Nights und Finalabend.</p>${onlineNavRole==='admin'?btn('Saison erstellen','createLeagueForm()'):''}</div>`:leagueDetail(l)}<div class="section"><h2>Saisonarchiv</h2></div>${db.leagues.filter(x=>x.online&&x.closed).map(x=>`<div class="panel"><strong>${esc(x.title)}</strong> ${btn('Ansehen',`showArchived('${x.id}')`,'secondary')}</div>`).join('')||'<p class="muted">Noch keine abgeschlossenen Saisons.</p>'}`}
 function createLeagueForm(){if(onlineNavRole!=='admin')return showAppAlert('Nur der Administrator kann eine Saison erstellen.');if(db.leagues.some(l=>l.online&&!l.closed))return showAppAlert('Es läuft bereits eine Saison.');renderLeagueForm()}
