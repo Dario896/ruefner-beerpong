@@ -518,16 +518,16 @@ function playerStats(){
  if(!p||p.isDeleted)return `<div class="notice">Spieler nicht gefunden.</div>${btn('← Zurück',"go('stats')")}`;
  const allGs=allOnlineStatResults().filter(g=>g.player_a===pid||g.player_b===pid);
  const gs=allGs.filter(g=>inStatsPeriod(g.played_at));
- let shots=0,hits=0,trickAttempts=0,trickHits=0,islandAttempts=0,islandHits=0,finishAttempts=0,finishHits=0,normalFinishes=0,comboFinishes=0,bombFinishes=0,bombs=0,combos=0,turns=0,cups=0;
+ let shots=0,hits=0,trickAttempts=0,trickHits=0,islandAttempts=0,islandHits=0,finishAttempts=0,finishHits=0,normalFinishes=0,comboFinishes=0,bombFinishes=0,deathCupFinishes=0,bombs=0,combos=0,turns=0,cups=0;
  let bestWin=null,bestLoss=null,complete=0;
  for(const g of allGs){
    const isA=g.player_a===pid,s=isA?g.side_a:g.side_b,opp=isA?g.side_b:g.side_a;
    const inPeriod=inStatsPeriod(g.played_at);
    if(inPeriod){shots+=Number(s?.shots)||0;hits+=Number(s?.hits)||0;}
    if(inPeriod){bombs+=Number(s?.bombs)||0;combos+=Number(s?.combos)||0;islandAttempts+=Number(s?.islandAttempts)||0;islandHits+=Number(s?.islandHits)||0;}
-   const fields=['trickAttempts','trickHits','finishAttempts','finishHits','normalFinishes','comboFinishes','bombFinishes'];
+   const fields=['trickAttempts','trickHits','finishAttempts','finishHits','normalFinishes','comboFinishes','bombFinishes','deathCupFinishes'];
    if(inPeriod)for(const k of fields)if(s?.[k]!=null&&Number.isFinite(Number(s[k])))evalStat(k,Number(s[k]));
-  function evalStat(k,v){switch(k){case 'trickAttempts':trickAttempts+=v;break;case 'trickHits':trickHits+=v;break;case 'finishAttempts':finishAttempts+=v;break;case 'finishHits':finishHits+=v;break;case 'normalFinishes':normalFinishes+=v;break;case 'comboFinishes':comboFinishes+=v;break;case 'bombFinishes':bombFinishes+=v;break;}}
+  function evalStat(k,v){switch(k){case 'trickAttempts':trickAttempts+=v;break;case 'trickHits':trickHits+=v;break;case 'finishAttempts':finishAttempts+=v;break;case 'finishHits':finishHits+=v;break;case 'normalFinishes':normalFinishes+=v;break;case 'comboFinishes':comboFinishes+=v;break;case 'bombFinishes':bombFinishes+=v;break;case 'deathCupFinishes':deathCupFinishes+=v;break;}}
   if(typeof s?.turns==='number'&&s.turns>0){
    const c=10-(Number(opp?.remaining)||0),t=s.turns,avg=c/t;
     if(inPeriod){cups+=c;turns+=t;complete++;}
@@ -546,7 +546,7 @@ function playerStats(){
  return `<div class="stats-back-row">${btn('← Zur Statistik',"go('stats')",'secondary')}</div>${periodControls()}<div class="section player-stats-intro"><h2 class="player-stats-heading"><button class="stats-avatar-zoom" onclick="openStatsPhoto('${p.id}')" aria-label="Profilbild vergrössern">${avatar(p.id)}</button><span>${esc(p.name)}</span></h2>${p.status?`<p class="player-stats-status">${esc(p.status)}</p>`:''}</div>`+duel+
  card('🏆 Average',row('Gesamt-AVG',formatAvg(cups,turns))+row('Höchster Winning-AVG',rec(bestWin))+row('Höchster Losing-AVG',rec(bestLoss)),true)+
  card('🎯 Wurfstatistik',row('Geworfene Bälle',shots)+row('Treffer',hits)+row('Trefferquote',formatPct(hits,shots))+row('Trickshot-Versuche',trickAttempts||complete?trickAttempts:'–')+row('Trickshot-Trefferquote',formatPct(trickHits,trickAttempts)))+
- card('🏁 Finishstatistik',row('Finishversuche',finishAttempts||complete?finishAttempts:'–')+row('Erfolgreiche Finishes',finishHits||complete?finishHits:'–')+row('Finishquote',formatPct(finishHits,finishAttempts))+row('Normale Finishes',normalFinishes||complete?normalFinishes:'–')+row('Kombifinishes',comboFinishes||complete?comboFinishes:'–')+row('Bombenfinishes',bombFinishes||complete?bombFinishes:'–'))+
+ card('🏁 Finishstatistik',row('Finishversuche',finishAttempts||complete?finishAttempts:'–')+row('Erfolgreiche Finishes',finishHits||complete?finishHits:'–')+row('Finishquote',formatPct(finishHits,finishAttempts))+row('Normale Finishes',normalFinishes||complete?normalFinishes:'–')+row('Kombifinishes',comboFinishes||complete?comboFinishes:'–')+row('Bombenfinishes',bombFinishes||complete?bombFinishes:'–')+row('Death-Cup-Finishes',deathCupFinishes||complete?deathCupFinishes:'–'))+
  card('💣 Spezialstatistik',row('Bomben',bombs)+row('Kombinationen',combos)+row('Island-Versuche',islandAttempts)+row('Island-Treffer',islandHits)+row('Island-Trefferquote',formatPct(islandHits,islandAttempts))+row('Becherdifferenz',(()=>{const d=gs.reduce((v,g)=>{const a=g.player_a===pid,s=a?g.side_a:g.side_b,o=a?g.side_b:g.side_a;return v+(Number(s?.remaining)||0)-(Number(o?.remaining)||0)},0);return (d>0?'+':'')+d})()))+
  (complete<gs.length?`<p class="muted">Hinweis: Average und neue Detailwerte sind nur für die ${complete} Spiele ab V2.7 verfügbar. Ältere Ergebnisse bleiben erhalten.</p>`:'')+achievementMarkup(pid);
 }
@@ -579,7 +579,7 @@ function friendship(){
 function pairPicker(ids){const ps=ids||db.players.filter(p=>!p.isDeleted).filter((p,i,arr)=>arr.findIndex(q=>q.name.toLocaleLowerCase('de')===p.name.toLocaleLowerCase('de'))===i).map(p=>p.id);return `<div class="field"><label style="color:#69baff;font-weight:800">Spieler 1</label><select id="p1">${ps.map(p=>`<option value="${p}">${esc(name(p))}</option>`).join('')}</select></div><div class="field"><label style="color:#ff788e;font-weight:800">Spieler 2</label><select id="p2">${ps.map((p,i)=>`<option value="${p}" ${i===1?'selected':''}>${esc(name(p))}</option>`).join('')}</select></div>`}
 function startTraining(){if(!requireProfile())return;startMatch(db.current,'COM','training',null,Number(document.getElementById('difficulty').value),document.getElementById('trainingRerack').value==='yes')}
 function startFriendly(){if(db.players.length<2)return showAppAlert('Erstelle zuerst mindestens zwei Profile.');const a=document.getElementById('p1').value,b=document.getElementById('p2').value;if(a===b)return showAppAlert('Bitte zwei unterschiedliche Spieler wählen.');startMatch(a,b,'friendly')}
-function newSide(){return {achievementConsecutiveMisses:0,achievementMissStreak15:false,achievementMissedMatchballs:0,achievementTurnHits:0,achievementTurnCups:0,achievementTurnBombFinishes:0,achievementMaxTurn:0,achievementFirstTurn:0,achievementLastTurn:0,achievementReceivedSix:false,achievementSix:false,achievementMissStart:0,achievementColdStart:false,achievementPantsTurns:0,achievementPantsStartTurn:0,achievementPantsAward:false,achievementPantsActive:false,achievementFirstHitDone:false,achievementComboFinish:false,achievementFourFinish:false,achievementDeathCup:false,achievementOwnGoal:false,achievementComeback:false,turns:0,finishAttempts:0,finishHits:0,normalFinishes:0,comboFinishes:0,bombFinishes:0,trickAttempts:0,trickHits:0,islandAttempts:0,islandHits:0,cups:Array.from({length:10},(_,i)=>i),layout:10,positions:formationCoords(10,0),reracked:false,shots:0,hits:0,bombs:0,combos:0}}
+function newSide(){return {achievementConsecutiveMisses:0,achievementMissStreak15:false,achievementMissedMatchballs:0,achievementTurnHits:0,achievementTurnCups:0,achievementTurnBombFinishes:0,achievementMaxTurn:0,achievementFirstTurn:0,achievementLastTurn:0,achievementReceivedSix:false,achievementSix:false,achievementMissStart:0,achievementColdStart:false,achievementPantsTurns:0,achievementPantsStartTurn:0,achievementPantsAward:false,achievementPantsActive:false,achievementFirstHitDone:false,achievementComboFinish:false,achievementFourFinish:false,achievementDeathCup:false,achievementOwnGoal:false,achievementComeback:false,turns:0,finishAttempts:0,finishHits:0,normalFinishes:0,comboFinishes:0,bombFinishes:0,deathCupFinishes:0,trickAttempts:0,trickHits:0,islandAttempts:0,islandHits:0,cups:Array.from({length:10},(_,i)=>i),layout:10,positions:formationCoords(10,0),reracked:false,shots:0,hits:0,bombs:0,combos:0}}
 function formationCoords(n,v){
  const pattern=(formationPatterns[n]||formationPatterns[10])[v]||(formationPatterns[n]||formationPatterns[10])[0];
  const maxRow=Math.max(...pattern.map(([r])=>r));
@@ -924,7 +924,18 @@ function deathCup(){if(!match||match.kind==='training'||match.finished||match.pe
 function cancelDeathCup(){ui.deathCup=false;render()}
 function chooseDeathCupWinner(side){
  if(!match||!ui.deathCup||match.finished||![0,1].includes(side))return;
- snapshot();match.finished=true;match.winner=[match.a,match.b][side];match.sides[side].achievementDeathCup=true;match.round=[];match.pending=null;match.islandChoice=null;match.islandQueue=[];ui.islandActive=false;match.bonus=false;match.tricks=0;match.bonusPhase=false;match.awaitingTrick=false;match.comboActive=false;
+ snapshot();
+ // Der Death Cup ist ein eigener erfolgreicher Wurf und beendet das Spiel.
+ // Nur der erste reguläre Wurf der laufenden Aufnahme zählt als halbe Aufnahme.
+ const firstRegular=side===match.turn&&match.round.length===0&&!match.bonusPhase&&!match.comboActive&&!(match.comboBonusThrows>0)&&!match.bonus;
+ const winnerSide=match.sides[side],loserSide=match.sides[1-side];
+ winnerSide.shots++;winnerSide.hits++;
+ winnerSide.finishAttempts++;winnerSide.finishHits++;winnerSide.deathCupFinishes=(winnerSide.deathCupFinishes||0)+1;
+ winnerSide.achievementDeathCup=true;
+ if(firstRegular)match.halfTurnWinner=side;
+ // Für PL-Endstand, Becherdifferenz und AVG müssen alle Gegnerbecher weg sein.
+ loserSide.cups=[];
+ match.finished=true;match.winner=[match.a,match.b][side];match.round=[];match.pending=null;match.islandChoice=null;match.islandQueue=[];ui.islandActive=false;match.bonus=false;match.tricks=0;match.bonusPhase=false;match.awaitingTrick=false;match.comboActive=false;
  ui.deathCup=false;render();
 }
 function ownGoal(){if(!match||match.kind==='training'||match.finished||match.pending)return;ui.ownGoal=true;ui.rerack=false;render()}
@@ -939,7 +950,7 @@ async function finishMatch(){
    showAppAlert('Diese Begegnung wurde bereits abgeschlossen oder ist gesperrt.');return;
   }
  }
- const g={id:match.id,date:new Date().toISOString(),a:match.a,b:match.b,winner:match.winner,kind:match.kind,ref:match.ref,sides:match.sides.map((s,i)=>({remaining:s.cups.length,shots:s.shots,hits:s.hits,bombs:s.bombs,combos:s.combos,turns:s.turns-(match.halfTurnWinner===i?.5:0),trickAttempts:s.trickAttempts,trickHits:s.trickHits,islandAttempts:s.islandAttempts,islandHits:s.islandHits,finishAttempts:s.finishAttempts,finishHits:s.finishHits,normalFinishes:s.normalFinishes,comboFinishes:s.comboFinishes,bombFinishes:s.bombFinishes,
+ const g={id:match.id,date:new Date().toISOString(),a:match.a,b:match.b,winner:match.winner,kind:match.kind,ref:match.ref,sides:match.sides.map((s,i)=>({remaining:s.cups.length,shots:s.shots,hits:s.hits,bombs:s.bombs,combos:s.combos,turns:s.turns-(match.halfTurnWinner===i?.5:0),trickAttempts:s.trickAttempts,trickHits:s.trickHits,islandAttempts:s.islandAttempts,islandHits:s.islandHits,finishAttempts:s.finishAttempts,finishHits:s.finishHits,normalFinishes:s.normalFinishes,comboFinishes:s.comboFinishes,bombFinishes:s.bombFinishes,deathCupFinishes:s.deathCupFinishes||0,
   achievementMaxTurn:s.achievementMaxTurn,achievementFirstTurn:s.achievementFirstTurn,
   achievementLastTurn:s.achievementLastTurn,achievementReceivedSix:s.achievementReceivedSix,
   achievementSix:s.achievementSix,achievementColdStart:s.achievementColdStart,
@@ -998,7 +1009,7 @@ function matchSummaryPage(){
  ['Trickshot-Trefferquote',formatPct(a.trickHits,a.trickAttempts),formatPct(b.trickHits,b.trickAttempts)]]:[]),
  ['Finishversuche',val(a,'finishAttempts'),val(b,'finishAttempts')],['Erfolgreiche Finishes',val(a,'finishHits'),val(b,'finishHits')],
  ['Finishquote',formatPct(a.finishHits,a.finishAttempts),formatPct(b.finishHits,b.finishAttempts)],
- ['Normale Finishes',val(a,'normalFinishes'),val(b,'normalFinishes')],['Kombifinishes',val(a,'comboFinishes'),val(b,'comboFinishes')],['Bombenfinishes',val(a,'bombFinishes'),val(b,'bombFinishes')],
+ ['Normale Finishes',val(a,'normalFinishes'),val(b,'normalFinishes')],['Kombifinishes',val(a,'comboFinishes'),val(b,'comboFinishes')],['Bombenfinishes',val(a,'bombFinishes'),val(b,'bombFinishes')],['Death-Cup-Finishes',val(a,'deathCupFinishes'),val(b,'deathCupFinishes')],
  ['Bomben',val(a,'bombs'),val(b,'bombs')],['Kombinationen',val(a,'combos'),val(b,'combos')],
  ...(val(a,'islandAttempts')+val(b,'islandAttempts')>0?[
  ['Island-Versuche',val(a,'islandAttempts'),val(b,'islandAttempts')],['Island-Treffer',val(a,'islandHits'),val(b,'islandHits')],
@@ -1066,10 +1077,10 @@ function plPlayerStats(){
  if(!l)return '<div class="notice">Saison nicht gefunden.</div>';
  const x=leagueStandings(l).find(x=>x.pid===pid);if(!x)return '<div class="notice">Spieler nicht gefunden.</div>';
  const p=player(pid),games=leagueGames(l).filter(g=>g.a===pid||g.b===pid);
- let bestWin=null,bestLoss=null,turns=0,cups=0,normalFinishes=0,comboFinishes=0,bombFinishes=0;
+ let bestWin=null,bestLoss=null,turns=0,cups=0,normalFinishes=0,comboFinishes=0,bombFinishes=0,deathCupFinishes=0;
  for(const g of games){
   const isA=g.a===pid,side=g.sides[isA?0:1],opp=g.sides[isA?1:0],t=Number(side?.turns)||0;
-  normalFinishes+=Number(side?.normalFinishes)||0;comboFinishes+=Number(side?.comboFinishes)||0;bombFinishes+=Number(side?.bombFinishes)||0;
+  normalFinishes+=Number(side?.normalFinishes)||0;comboFinishes+=Number(side?.comboFinishes)||0;bombFinishes+=Number(side?.bombFinishes)||0;deathCupFinishes+=Number(side?.deathCupFinishes)||0;
   if(t>0){const c=10-(Number(opp?.remaining)||0),avg=c/t;
    turns+=t;cups+=c;
    const r={avg,opponent:name(isA?g.b:g.a),date:g.date};
@@ -1091,7 +1102,7 @@ function plPlayerStats(){
  card('🏆 Premier League',row('Punkte',x.points)+row('Gewonnene Nights',x.nights)+row('Spiele',x.wins+x.losses)+row('Siege',x.wins)+row('Niederlagen',x.losses),true)+
  card('🏆 Average',row('Gesamt-AVG',formatAvg(cups,turns))+row('Höchster Winning-AVG',rec(bestWin))+row('Höchster Losing-AVG',rec(bestLoss)),true)+
  card('🎯 Wurfstatistik',row('Geworfene Bälle',x.shots)+row('Treffer',x.hits)+row('Trefferquote',formatPct(x.hits,x.shots))+row('Trickshot-Versuche',x.trickAttempts)+row('Trickshot-Trefferquote',formatPct(x.trickHits,x.trickAttempts)))+
- card('🏁 Finishstatistik',row('Finishversuche',x.finishAttempts)+row('Erfolgreiche Finishes',x.finishHits)+row('Finishquote',formatPct(x.finishHits,x.finishAttempts))+row('Normale Finishes',normalFinishes)+row('Kombifinishes',comboFinishes)+row('Bombenfinishes',bombFinishes))+
+ card('🏁 Finishstatistik',row('Finishversuche',x.finishAttempts)+row('Erfolgreiche Finishes',x.finishHits)+row('Finishquote',formatPct(x.finishHits,x.finishAttempts))+row('Normale Finishes',normalFinishes)+row('Kombifinishes',comboFinishes)+row('Bombenfinishes',bombFinishes)+row('Death-Cup-Finishes',deathCupFinishes))+
  card('💣 Spezialstatistik',row('Bomben',x.bombs)+row('Kombinationen',x.combos)+row('Island-Versuche',x.islandAttempts)+row('Island-Treffer',x.islandHits)+row('Island-Trefferquote',formatPct(x.islandHits,x.islandAttempts))+row('Becherdifferenz',diff));
 }
 function standingsTable(rows,detailLeague=null){return `<style>
@@ -1149,15 +1160,15 @@ function plEditMatch(gid){
  const l=db.leagues.find(x=>x.id===g.ref.league);if(!l)return;
  const finalAlreadyPlayed=g.ref.stage.startsWith('semi')&&!!plGame(l,g.ref.night,'final');
  const winnerChoices=[g.a,g.b].map(pid=>`<option value="${esc(pid)}" ${g.winner===pid?'selected':''}>${esc(name(pid))}</option>`).join('');
- const fields=['remaining','shots','hits','turns','bombs','combos','trickAttempts','trickHits','islandAttempts','islandHits','finishAttempts','finishHits','normalFinishes','comboFinishes','bombFinishes'];
- const inputs=g.sides.map((side,i)=>`<div class="panel"><h3>${esc(name(i===0?g.a:g.b))}</h3>${fields.map(k=>`<div class="field"><label>${esc(k)}</label><input type="number" min="0" max="${k==='remaining'?10:9999}" id="pl_${i}_${k}" value="${Number(side[k])||0}"></div>`).join('')}</div>`).join('');
+ const fields=['remaining','shots','hits','turns','bombs','combos','trickAttempts','trickHits','islandAttempts','islandHits','finishAttempts','finishHits','normalFinishes','comboFinishes','bombFinishes','deathCupFinishes'];
+ const inputs=g.sides.map((side,i)=>`<div class="panel"><h3>${esc(name(i===0?g.a:g.b))}</h3>${fields.map(k=>`<div class="field"><label>${k==='deathCupFinishes'?'💀 Death-Cup-Finishes':esc(k)}</label><input type="number" min="0" max="${k==='remaining'?10:9999}" id="pl_${i}_${k}" value="${Number(side[k])||0}"></div>`).join('')}</div>`).join('');
  ui.plEdit=gid;
  document.getElementById('app').innerHTML=`<div class="shell">${header()}<h2>PL-Begegnung bearbeiten</h2><p>${esc(l.title)} · Night ${g.ref.night}</p><div class="panel"><label>Sieger</label><select id="pl_winner" ${finalAlreadyPlayed?'disabled':''}>${winnerChoices}</select>${finalAlreadyPlayed?'<p class="muted">Nach einem gespielten Finale kann der Halbfinalsieger nicht geändert werden.</p>':''}</div>${inputs}${btn('Änderungen speichern',`plSaveMatchEdit('${gid}')`)} ${btn('Abbrechen',"go('league')",'secondary')}</div>`;
 }
 async function plSaveMatchEdit(gid){
  if(onlineNavRole!=='admin')return;
  const g=db.games.find(x=>x.id===gid&&x.kind==='league');if(!g)return;
- const fields=['remaining','shots','hits','turns','bombs','combos','trickAttempts','trickHits','islandAttempts','islandHits','finishAttempts','finishHits','normalFinishes','comboFinishes','bombFinishes'];
+ const fields=['remaining','shots','hits','turns','bombs','combos','trickAttempts','trickHits','islandAttempts','islandHits','finishAttempts','finishHits','normalFinishes','comboFinishes','bombFinishes','deathCupFinishes'];
  const sides=g.sides.map((side,i)=>({...side,...Object.fromEntries(fields.map(k=>[k,Number(document.getElementById('pl_'+i+'_'+k)?.value)]))}));
  if(sides.some(x=>fields.some(k=>!Number.isInteger(x[k])||x[k]<0||x[k]>(k==='remaining'?10:9999))))return showAppAlert('Ungültige Statistikwerte.');
  if(sides.some(x=>x.hits>x.shots||x.islandHits>x.islandAttempts||x.trickHits>x.trickAttempts||x.finishHits>x.finishAttempts))return showAppAlert('Treffer dürfen Versuche nicht übersteigen.');
