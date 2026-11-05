@@ -1161,7 +1161,7 @@ function plEditMatch(gid){
  const finalAlreadyPlayed=g.ref.stage.startsWith('semi')&&!!plGame(l,g.ref.night,'final');
  const winnerChoices=[g.a,g.b].map(pid=>`<option value="${esc(pid)}" ${g.winner===pid?'selected':''}>${esc(name(pid))}</option>`).join('');
  const fields=['remaining','shots','hits','turns','bombs','combos','trickAttempts','trickHits','islandAttempts','islandHits','finishAttempts','finishHits','normalFinishes','comboFinishes','bombFinishes','deathCupFinishes'];
- const inputs=g.sides.map((side,i)=>`<div class="panel"><h3>${esc(name(i===0?g.a:g.b))}</h3>${fields.map(k=>`<div class="field"><label>${k==='deathCupFinishes'?'💀 Death-Cup-Finishes':esc(k)}</label><input type="number" min="0" max="${k==='remaining'?10:9999}" id="pl_${i}_${k}" value="${Number(side[k])||0}"></div>`).join('')}</div>`).join('');
+ const inputs=g.sides.map((side,i)=>`<div class="panel"><h3>${esc(name(i===0?g.a:g.b))}</h3>${fields.map(k=>`<div class="field"><label>${k==='deathCupFinishes'?'💀 Death-Cup-Finishes':esc(k)}</label><input type="number" min="0" step="${k==='turns'?0.5:1}" max="${k==='remaining'?10:9999}" id="pl_${i}_${k}" value="${Number(side[k])||0}"></div>`).join('')}</div>`).join('');
  ui.plEdit=gid;
  document.getElementById('app').innerHTML=`<div class="shell">${header()}<h2>PL-Begegnung bearbeiten</h2><p>${esc(l.title)} · Night ${g.ref.night}</p><div class="panel"><label>Sieger</label><select id="pl_winner" ${finalAlreadyPlayed?'disabled':''}>${winnerChoices}</select>${finalAlreadyPlayed?'<p class="muted">Nach einem gespielten Finale kann der Halbfinalsieger nicht geändert werden.</p>':''}</div>${inputs}${btn('Änderungen speichern',`plSaveMatchEdit('${gid}')`)} ${btn('Abbrechen',"go('league')",'secondary')}</div>`;
 }
@@ -1170,7 +1170,7 @@ async function plSaveMatchEdit(gid){
  const g=db.games.find(x=>x.id===gid&&x.kind==='league');if(!g)return;
  const fields=['remaining','shots','hits','turns','bombs','combos','trickAttempts','trickHits','islandAttempts','islandHits','finishAttempts','finishHits','normalFinishes','comboFinishes','bombFinishes','deathCupFinishes'];
  const sides=g.sides.map((side,i)=>({...side,...Object.fromEntries(fields.map(k=>[k,Number(document.getElementById('pl_'+i+'_'+k)?.value)]))}));
- if(sides.some(x=>fields.some(k=>!Number.isInteger(x[k])||x[k]<0||x[k]>(k==='remaining'?10:9999))))return showAppAlert('Ungültige Statistikwerte.');
+ if(sides.some(x=>fields.some(k=>!(k==='turns'?Number.isInteger(x[k]*2):Number.isInteger(x[k]))||x[k]<0||x[k]>(k==='remaining'?10:9999))))return showAppAlert('Ungültige Statistikwerte.');
  if(sides.some(x=>x.hits>x.shots||x.islandHits>x.islandAttempts||x.trickHits>x.trickAttempts||x.finishHits>x.finishAttempts))return showAppAlert('Treffer dürfen Versuche nicht übersteigen.');
  const winner=document.getElementById('pl_winner').value;
  const wi=winner===g.a?0:1;
