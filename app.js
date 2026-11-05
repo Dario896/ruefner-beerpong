@@ -474,7 +474,7 @@ function achievementRowsFor(pid){
   add(16,s.achievementReceivedSix===true);
   add(17,s.achievementSix===true);
   add(18,s.achievementOwnGoal===true);
-  add(19,win&&s.achievementDeathCup===true);
+  add(19,win&&(s.achievementDeathCup===true||Number(s.deathCupFinishes)>0));
   add(20,win&&Number(s.finishAttempts)===1&&Number(s.finishHits)===1);
   add(21,win&&(s.reracked===false||g.kind==='league'||db.games.some(x=>x.id===g.client_match_id&&x.kind==='league')));
   add(23,win);
@@ -1161,7 +1161,7 @@ function plEditMatch(gid){
  const finalAlreadyPlayed=g.ref.stage.startsWith('semi')&&!!plGame(l,g.ref.night,'final');
  const winnerChoices=[g.a,g.b].map(pid=>`<option value="${esc(pid)}" ${g.winner===pid?'selected':''}>${esc(name(pid))}</option>`).join('');
  const fields=['remaining','shots','hits','turns','bombs','combos','trickAttempts','trickHits','islandAttempts','islandHits','finishAttempts','finishHits','normalFinishes','comboFinishes','bombFinishes','deathCupFinishes'];
- const inputs=g.sides.map((side,i)=>`<div class="panel"><h3>${esc(name(i===0?g.a:g.b))}</h3>${fields.map(k=>`<div class="field"><label>${k==='deathCupFinishes'?'💀 Death-Cup-Finishes':esc(k)}</label><input type="number" min="0" step="${k==='turns'?0.5:1}" max="${k==='remaining'?10:9999}" id="pl_${i}_${k}" value="${Number(side[k])||0}"></div>`).join('')}</div>`).join('');
+ const inputs=g.sides.map((side,i)=>`<div class="panel"><h3>${esc(name(i===0?g.a:g.b))}</h3>${fields.map(k=>`<div class="field"><label>${k==='deathCupFinishes'?'Death-Cup-Finishes':esc(k)}</label><input type="number" min="0" step="${k==='turns'?0.5:1}" max="${k==='remaining'?10:9999}" id="pl_${i}_${k}" value="${Number(side[k])||0}"></div>`).join('')}</div>`).join('');
  ui.plEdit=gid;
  document.getElementById('app').innerHTML=`<div class="shell">${header()}<h2>PL-Begegnung bearbeiten</h2><p>${esc(l.title)} · Night ${g.ref.night}</p><div class="panel"><label>Sieger</label><select id="pl_winner" ${finalAlreadyPlayed?'disabled':''}>${winnerChoices}</select>${finalAlreadyPlayed?'<p class="muted">Nach einem gespielten Finale kann der Halbfinalsieger nicht geändert werden.</p>':''}</div>${inputs}${btn('Änderungen speichern',`plSaveMatchEdit('${gid}')`)} ${btn('Abbrechen',"go('league')",'secondary')}</div>`;
 }
