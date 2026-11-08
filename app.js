@@ -215,11 +215,14 @@ function kingCreate(){
  const ids=[...document.querySelectorAll('.kot-player-select')].map(x=>x.value);
  if(ids.length<3)return showAppAlert('Mindestens drei registrierte Spieler auswählen.');
  if(new Set(ids).size!==ids.length)return showAppAlert('Jeder Spieler darf nur einmal ausgewählt werden. Bitte unterschiedliche Spieler wählen.');
- kot={tournamentId:crypto.randomUUID(),current:[ids[0],ids[1]],queue:ids.slice(2),champion:null,streak:0,matches:0,winner:null,winIds:[]};render();
+ kot={tournamentId:crypto.randomUUID(),current:[ids[0],ids[1]],queue:ids.slice(2),champion:null,streak:0,matches:0,winner:null,winIds:[]};kingStart();
 }
 function kingSkip(){
  if(!kot||kot.winner||match||pendingStart||kot.queue.length<2)return;
- kot.queue.push(kot.queue.shift());render();
+ const skipped=kot.current[1];
+ kot.current[1]=kot.queue.shift();
+ kot.queue.push(skipped);
+ render();
 }
 function kingStart(){
  if(onlineNavRole!=='admin'||!kot||kot.winner||!kot.current||match)return;
@@ -1077,7 +1080,10 @@ async function finishMatch(){
  }
  save();if(g.kind==='king'){try{await kotRecordWin(g)}catch(e){showAppAlert('Einzelmatch wurde gespeichert, aber die King-Historie konnte nicht abgeschlossen werden: '+e.message+'\nBitte nicht erneut spielen, bevor wir das geprüft haben.');return;}}completedMatchSummary=g;match=null;go('matchSummary');
 }
-function closeMatchSummary(){const kind=completedMatchSummary?.kind;completedMatchSummary=null;go(kind==='training'?'home':kind==='league'?'league':kind==='king'?'king':'stats')}
+function closeMatchSummary(){const kind=completedMatchSummary?.kind;if(kind==='king'){if(kot?.winner){completedMatchSummary=null;kot=null;go('home');}else kingNextMatch();return;}completedMatchSummary=null;go(kind==='training'?'home':kind==='league'?'league':'stats')}
+function kingNextMatch(){if(!kot||kot.winner||!completedMatchSummary||completedMatchSummary.kind!=='king'||match)return;completedMatchSummary=null;kingStart();}
+function kingSkipFromSummary(){if(!kot||kot.winner||!completedMatchSummary||completedMatchSummary.kind!=='king'||match||kot.queue.length<1)return;const skipped=kot.current[1];kot.current[1]=kot.queue.shift();kot.queue.push(skipped);render();}
+function kingAbortFromSummary(){if(!kot||!completedMatchSummary||completedMatchSummary.kind!=='king')return;showAppConfirm('Durchgang abbrechen? Bereits abgeschlossene Spiele bleiben in der Statistik, aber es gibt keinen Turniersieger.',()=>{completedMatchSummary=null;kot=null;go('home')});}
 function matchSummaryPage(){
  const g=completedMatchSummary;if(!g)return `<div class="panel">Keine Spielzusammenfassung vorhanden.</div>${btn('Zum Menü',"go('home')")}`;
  const a=g.sides[0],b=g.sides[1];
@@ -1098,7 +1104,7 @@ function matchSummaryPage(){
  ['Island-Trefferquote',formatPct(a.islandHits,a.islandAttempts),formatPct(b.islandHits,b.islandAttempts)]]:[])
  ];
  const scoreA=Number(a.remaining||0),scoreB=Number(b.remaining||0);
- return `<div class="section"><h2>📊 Match-Statistik</h2><p class="muted">🏆 ${esc(name(g.winner))} hat gewonnen!</p></div><div class="panel"><div class="table-wrap"><table class="table" style="width:100%;table-layout:fixed;text-align:center"><thead><tr><th style="width:30%;overflow-wrap:anywhere">${avatar(g.a)} ${esc(name(g.a))}</th><th style="width:40%;font-size:1.5em;white-space:nowrap">${scoreA} : ${scoreB}</th><th style="width:30%;overflow-wrap:anywhere">${avatar(g.b)} ${esc(name(g.b))}</th></tr></thead><tbody>${rows.map(([label,x,y])=>`<tr><td><strong>${esc(x)}</strong></td><td style="font-size:.85em">${esc(label)}</td><td><strong>${esc(y)}</strong></td></tr>`).join('')}</tbody></table></div></div><div style="margin:20px 0;text-align:center">${btn('✓ Statistik schliessen','closeMatchSummary()')}</div>`;
+ return `<div class="section"><h2>📊 Match-Statistik</h2><p class="muted">🏆 ${esc(name(g.winner))} hat gewonnen!</p></div><div class="panel"><div class="table-wrap"><table class="table" style="width:100%;table-layout:fixed;text-align:center"><thead><tr><th style="width:30%;overflow-wrap:anywhere">${avatar(g.a)} ${esc(name(g.a))}</th><th style="width:40%;font-size:1.5em;white-space:nowrap">${scoreA} : ${scoreB}</th><th style="width:30%;overflow-wrap:anywhere">${avatar(g.b)} ${esc(name(g.b))}</th></tr></thead><tbody>${rows.map(([label,x,y])=>`<tr><td><strong>${esc(x)}</strong></td><td style="font-size:.85em">${esc(label)}</td><td><strong>${esc(y)}</strong></td></tr>`).join('')}</tbody></table></div></div><div style="margin:20px 0;text-align:center">${g.kind==='king'&&kot?kot.winner?`<h3>👑 ${esc(name(kot.winner))} ist King of the Table!</h3>${btn('✓ Turnier beenden','closeMatchSummary()')}`:`<p><strong>Nächstes Match: ${esc(name(kot.current[0]))} gegen ${esc(name(kot.current[1]))}</strong></p><div class="row" style="justify-content:center;gap:10px;flex-wrap:wrap">${btn('▶ Nächstes Match starten','kingNextMatch()')}${btn('⏭ Spieler überspringen','kingSkipFromSummary()','secondary')}${btn('Durchgang abbrechen','kingAbortFromSummary()','danger')}</div>`:btn('✓ Statistik schliessen','closeMatchSummary()')}</div>`;
 }
 function league(){if(!plLoaded&&!plLoading&&!plError)setTimeout(()=>loadPlOnline(),0);const l=db.leagues.filter(x=>x.online).find(x=>!x.closed);return (plError?`<div class="notice">Online-Fehler: ${esc(plError)} ${btn('Erneut versuchen','refreshPlOnline()','secondary')}</div>`:plLoading?'<p class="muted">Premier League wird geladen …</p>':'')+ `<div class="section row between"><h2>🏆 Premier League</h2></div>${!l?`<div class="panel"><h3>Keine aktive Saison</h3><p class="muted">15 Nights und Finalabend.</p>${onlineNavRole==='admin'?btn('Saison erstellen','createLeagueForm()'):''}</div>`:leagueDetail(l)}<div class="section"><h2>Saisonarchiv</h2></div>${db.leagues.filter(x=>x.online&&x.closed).map(x=>`<div class="panel"><strong>${esc(x.title)}</strong> ${btn('Ansehen',`showArchived('${x.id}')`,'secondary')}</div>`).join('')||'<p class="muted">Noch keine abgeschlossenen Saisons.</p>'}`}
 function createLeagueForm(){if(onlineNavRole!=='admin')return showAppAlert('Nur der Administrator kann eine Saison erstellen.');if(db.leagues.some(l=>l.online&&!l.closed))return showAppAlert('Es läuft bereits eine Saison.');renderLeagueForm()}
