@@ -52,7 +52,7 @@ else {
   finally{$('reg-password').value='';button.disabled=false;}
  });
 
- let adminPlayers=[],activePlayers=[],adminGames=[],visibleGames=5,searchTerm='';
+ let adminPlayers=[],activePlayers=[],adminGames=[],visibleGames=5,searchTerm='',kingTournaments=[];
  async function adminAction(action,payload={}){
   const {data:{session}}=await client.auth.getSession();
   if(!session?.access_token)throw Error('Bitte erneut anmelden.');
@@ -159,6 +159,37 @@ else {
   if(filtered.length>visibleGames)root.append(button('📂 Weitere 10 Spiele anzeigen ▼',()=>{visibleGames+=10;showGames()}));
   if(!filtered.length)root.append(el('p','Keine passenden Spiele.','muted'));
  }
+ async function loadKingTournaments(){
+  const root=$('admin-king-tournaments');
+  root.replaceChildren(el('p','King-Turniere werden geladen …','muted'));
+  const {data,error}=await client.rpc('ruefner_kot_admin_list');
+  if(error){root.replaceChildren(el('p','King-Verwaltung noch nicht verfügbar: '+error.message,'notice'));return;}
+  kingTournaments=data||[];
+  showKingTournaments();
+ }
+ function showKingTournaments(){
+  const root=$('admin-king-tournaments');root.replaceChildren();
+  if(!kingTournaments.length){root.append(el('p','Noch keine gespeicherten King-Turniere.','muted'));return;}
+  for(const t of kingTournaments){
+   const box=el('div',undefined,'notice');
+   const date=t.last_played_at?new Date(t.last_played_at).toLocaleDateString('de-CH'):'–';
+   box.append(el('strong',`${date} · ${t.match_count} Match(es) · ${t.winner?('👑 '+label(t.winner)):'Nicht abgeschlossen'}`));
+   const detail=el('p','Turnier-ID: '+t.tournament_id,'muted');detail.style.overflowWrap='anywhere';box.append(detail);
+   const actions=el('div',undefined,'row');
+   actions.append(button('🗑️ Ganzes Turnier löschen',async()=>{
+    if(!confirm(`Alle ${t.match_count} King-Matches dieses Turniers samt Turniersieg löschen? Andere Spielmodi bleiben erhalten.`))return;
+    const check=prompt('Zur Bestätigung LÖSCHEN eingeben:');
+    if(check!=='LÖSCHEN')return;
+    try{
+     const {data,error}=await client.rpc('ruefner_kot_admin_delete_tournament',{p_tournament_id:t.tournament_id});
+     if(error)throw error;
+     alert(`${data} King-Match(es) gelöscht. Statistik beim nächsten Laden der App aktualisieren.`);
+     await loadAdmin();
+    }catch(e){alert('Turnier konnte nicht gelöscht werden: '+e.message)}
+   }));
+   box.append(actions);root.append(box);
+  }
+ }
  function showInvites(invites){
   const root=$('admin-invites');root.replaceChildren();
   for(const inv of invites){
@@ -180,7 +211,7 @@ else {
    const deletedIds=new Set(deleted.deletedIds||[]);
    adminPlayers=data?.players||[];adminGames=data?.games||[];
    activePlayers=adminPlayers.filter(p=>!deletedIds.has(p.id));
-   showPlayers();showGames();
+   showPlayers();showGames();await loadKingTournaments();
    const invites=await adminAction('list-invites');showInvites(invites.invites||[]);
    msg.textContent=activePlayers.length+' Spieler · '+adminGames.length+' Online-Spiele';
   }catch(e){msg.textContent='Admin-Zentrale: '+(e.message||'Unbekannter Fehler');}
