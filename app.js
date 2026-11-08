@@ -224,8 +224,8 @@ function kingSkip(){
 function kingStart(){
  if(onlineNavRole!=='admin'||!kot||kot.winner||!kot.current||match)return;
  const [a,b]=kot.current;
- // Existing friendly-style persistence and first-throw selection.
- startMatch(a,b,'king');
+ // First match: player 1 starts. Later matches: the incoming challenger (side 2) starts.
+ beginMatch(a,b,'king',null,0,kot.matches===0?0:1);
 }
 async function loadKotWinners(){
  if(kotWinnersLoading||kotWinnersLoaded||onlineNavRole!=='admin')return;
