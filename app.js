@@ -17,6 +17,9 @@ const formationPatterns={
 };
 const variantNames={6:['Grosse Pyramide'],5:['Full House 1','Full House 2','Full House 3'],4:['Vagina'],3:['Kleine Pyramide'],2:['Paar 1','Paar 2','Paar 3']};
 let db=load(),view='home',match=null,ui={},pendingStart=null,completedMatchSummary=null;
+let kot=null; // Admin-Test; nur abgeschlossene Einzelmatches werden online gespeichert.
+let kotWinnersOnline=[],kotWinnersLoading=false,kotWinnersError='';
+const KOT_RELEASE='21.12.2026';
 let selectedProfileId=null,profileZoom=false,profileStatusSaving=false,profileStatusEditor=false;
 let trickFlashTimer=null;
 let pantsFlashTimer=null;
@@ -57,6 +60,7 @@ function activeLeague(){return db.leagues.find(l=>!l.closed)}
 function isAdmin(){return db.current===db.admin}
 function reigningChampion(){const finished=db.leagues.filter(l=>l.online&&l.closed&&champion(l)).sort((a,b)=>new Date(b.created)-new Date(a.created));return finished.length?champion(finished[0]):null}
 function go(v){
+ if(v==='king'&&onlineNavRole!=='admin'){view='home';render();return;}
  if(view===v&&v!=='profiles'){render();return;}
  window.history.pushState({ruefnerView:v,profileId:selectedProfileId},'','#'+v);
  view=v;ui={};profileZoom=false;render();
@@ -89,7 +93,7 @@ window.addEventListener('popstate',()=>{
  }
  view=target?.ruefnerView||'home';selectedProfileId=target?.profileId||null;
  if(view==='playerStats'&&target?.playerStatsId)ui.playerStats=target.playerStatsId;
- if(!['home','profiles','profileDetail','training','friendship','league','stats','playerStats','plPlayerDetail','rules','game','history','firstThrow','matchSummary'].includes(view))view='home';
+ if(!['home','profiles','profileDetail','training','friendship','league','stats','playerStats','plPlayerDetail','rules','game','history','firstThrow','matchSummary','king'].includes(view))view='home';
  if(view==='game'&&!match)view='home';
  ui={};
  if(view==='plPlayerDetail'&&target?.plDetail)ui.plDetail=target.plDetail;
@@ -102,14 +106,14 @@ function header(){
  const account=onlineNavRole==='player'?'<a class="btn secondary" href="online.html?logout=1">🚪 Abmelden</a>':`<a class="btn secondary" href="online.html">${onlineNavRole==='admin'?'👑 Admin':'🔐 Online'}</a>`;
  return `<div class="top"><div class="brand" onclick="go('home')" style="cursor:pointer"><span class="brand-lines"><span class="brand-main">Rüfner</span><span class="brand-accent">Beer Pong</span></span></div><div class="top-actions">${btn('☰ Menü',"go('home')",'secondary')}${account}</div></div>`;
 }
-function render(){const root=document.getElementById('app');let body='';try{body=({home,profiles,profileDetail,training,friendship,league,stats,playerStats,plPlayerDetail:plPlayerStats,rules,game,history:historyPage,firstThrow,matchSummary:matchSummaryPage})[view]?.()||home()}catch(e){body=`<div class="notice">Fehler: ${esc(e.message)}</div>${btn('Zurück',"go('home')")}`};root.innerHTML=`<div class="shell ${view==='game'?'shell-game':''}">${view==='game'?'':header()}${body}${view==='game'?'':'<footer>Rüfner Beer Pong</footer>'}</div>${appDialogMarkup()}${profileZoomMarkup()}${profileStatusEditorMarkup()}`}
+function render(){const root=document.getElementById('app');let body='';try{body=({home,profiles,profileDetail,training,friendship,league,stats,playerStats,plPlayerDetail:plPlayerStats,rules,game,history:historyPage,firstThrow,matchSummary:matchSummaryPage,king:kingPage})[view]?.()||home()}catch(e){body=`<div class="notice">Fehler: ${esc(e.message)}</div>${btn('Zurück',"go('home')")}`};root.innerHTML=`<div class="shell ${view==='game'?'shell-game':''}">${view==='game'?'':header()}${body}${view==='game'?'':'<footer>Rüfner Beer Pong</footer>'}</div>${appDialogMarkup()}${profileZoomMarkup()}${profileStatusEditorMarkup()}`}
 let appDialog=null;
 function showAppAlert(message){appDialog={type:'alert',message:String(message)};render();}
 function showAppConfirm(message,onAccept){appDialog={type:'confirm',message:String(message),onAccept};render();}
 function closeAppDialog(){appDialog=null;render();}
 function acceptAppDialog(){const action=appDialog?.onAccept;appDialog=null;if(action)action();else render();}
 function appDialogMarkup(){if(!appDialog)return '';return `<div class="app-dialog-backdrop" role="dialog" aria-modal="true" aria-label="Hinweis"><div class="app-dialog-card"><div class="app-dialog-icon">${appDialog.type==='confirm'?'⚠️':'🍻'}</div><h2>${appDialog.type==='confirm'?'Bist du sicher?':'Hinweis'}</h2><p>${esc(appDialog.message).replace(/\n/g,'<br>')}</p><div class="app-dialog-buttons">${appDialog.type==='confirm'?btn('Ja, Spiel verlassen','acceptAppDialog()','danger')+btn('Weiterspielen','closeAppDialog()','secondary'):btn('OK','closeAppDialog()')}</div></div></div>`;}
-function home(){return `<div class="welcome-mini">${db.current?`${avatar(db.current)}<strong>Willkommen zurück, ${esc(name(db.current))}! 🍻</strong>`:`<strong>Willkommen bei Rüfner Beer Pong! 🍻</strong>`}</div><div class="grid">${[['🤖','Training','Du gegen Rüfner 3000. Privat, ohne Statistik.','training'],['🏓','Freundschaftsspiel','Echte Duelle mit gemeinsamer Statistik.','friendship'],['🏆','Premier League','15 Nights und ein grosses Finale.','league'],['📊','Statistiken','Ranglisten, Bomben und direkte Duelle.','stats'],['👤','Profile','Spieler verwalten und Profilbild ändern.','profiles'],['📖','Regeln','Das Rüfner Beer Pong Reglement.','rules']].map(a=>`<button class="card action" onclick="go('${a[3]}')"><div class="emoji">${a[0]}</div><h3>${a[1]}</h3><p>${a[2]}</p></button>`).join('')}</div>`}
+function home(){return `<div class="welcome-mini">${db.current?`${avatar(db.current)}<strong>Willkommen zurück, ${esc(name(db.current))}! 🍻</strong>`:`<strong>Willkommen bei Rüfner Beer Pong! 🍻</strong>`}</div><div class="grid">${[['🤖','Training','Du gegen Rüfner 3000. Privat, ohne Statistik.','training'],['🏓','Freundschaftsspiel','Echte Duelle mit gemeinsamer Statistik.','friendship'],['🏆','Premier League','15 Nights und ein grosses Finale.','league'],['📊','Statistiken','Ranglisten, Bomben und direkte Duelle.','stats'],['👤','Profile','Spieler verwalten und Profilbild ändern.','profiles'],['📖','Regeln','Das Rüfner Beer Pong Reglement.','rules']].map(a=>`<button class="card action" onclick="go('${a[3]}')"><div class="emoji">${a[0]}</div><h3>${a[1]}</h3><p>${a[2]}</p></button>`).join('')}<button class="card action ${onlineNavRole==='admin'?'':'kot-locked'}" ${onlineNavRole==='admin'?`onclick="go('king')"`:'disabled'}><div class="emoji">👑</div><h3>King of the Table</h3><p>${onlineNavRole==='admin'?'🔧 Admin-Testzugang':'🔒 Ab 21.12.2026'}</p></button></div>`}
 function profileImageUrl(pid){
  const p=player(pid),cfg=window.RUEFNER_SUPABASE;
  if(!p)return '';
@@ -173,6 +177,62 @@ async function photoProfile(e){
  }catch(err){showAppAlert('Profilbild konnte nicht online gespeichert werden: '+(err.message||err)+'\nBitte zuerst die beiliegende Supabase-SQL-Einrichtung ausführen.');}
 }
 function requireProfile(){if(!onlineUserId||!db.players.some(p=>p.id===db.current&&p.onlineId===onlineUserId)){go('profiles');return false}return true}
+// KING OF THE TABLE – Admin-Testphase. Matches use the existing friendly cloud table.
+function kingPage(){
+ if(onlineNavRole!=='admin')return '<div class="panel">🔒 Ab 21.12.2026</div>';
+ if(!onlineDirectoryLoaded&&!onlineDirectoryLoading)setTimeout(loadOnlinePlayers,0);
+ if(!kotWinnersLoading&&!kotWinnersOnline.length&&!kotWinnersError)setTimeout(loadKotWinners,0);
+ if(!kot){
+  const ps=db.players.filter(p=>p.onlineId&&!p.isDeleted);
+  return `<div class="section"><h2>👑 King of the Table</h2><p class="muted">Admin-Test · Einzelspiele zählen wie Freundschaftsspiele.</p></div><div class="panel"><h3>Teilnehmer wählen (mindestens 3)</h3>${ps.map(p=>`<label style="display:block;margin:10px 0"><input type="checkbox" class="kot-player" value="${esc(p.id)}"> ${esc(p.name)}</label>`).join('')}${btn('Turnier starten','kingCreate()')}</div>`;
+ }
+ const active=kot.current?`<p>Aktuell: <strong>${esc(name(kot.current[0]))} gegen ${esc(name(kot.current[1]))}</strong></p>${btn('Match starten','kingStart()')}`:'';
+ return `<div class="section"><h2>👑 King of the Table</h2><p class="muted">Admin-Test · Drei Siege in Folge gewinnen.</p></div><div class="panel">${kot.winner?`<h2>👑 ${esc(name(kot.winner))} ist King of the Table!</h2>`:active}<p>Aktuelle Siegesserie: ${kot.streak} · Gespielte Matches: ${kot.matches}</p><h3>Warteschlange</h3><p>${kot.queue.map(x=>esc(name(x))).join(' → ')||'–'}</p>${!kot.winner&&kot.current&&kot.queue.length?btn('⏭ Nächsten Spieler überspringen','kingSkip()','secondary'):''}${kot.winner?btn('Neuen Durchgang','kingReset()'):btn('Durchgang abbrechen','kingAbort()','danger')}</div>${kotWinnersOnline.length?`<div class="panel"><h3>Abgeschlossene Durchgänge (online)</h3>${kotWinnersOnline.map(w=>`<p>👑 ${esc(plName(plLocalId(w.winner)))} · ${esc(new Date(w.completed_at).toLocaleDateString('de-CH'))}</p>`).join('')}</div>`:''}${kotWinnersError?`<p class="notice">${esc(kotWinnersError)}</p>`:''}`;
+}
+function kingCreate(){
+ if(onlineNavRole!=='admin')return;
+ const ids=[...document.querySelectorAll('.kot-player:checked')].map(x=>x.value);
+ if(ids.length<3)return showAppAlert('Mindestens drei registrierte Spieler auswählen.');
+ if(new Set(ids).size!==ids.length)return;
+ kot={tournamentId:crypto.randomUUID(),current:[ids[0],ids[1]],queue:ids.slice(2),champion:null,streak:0,matches:0,winner:null,winIds:[]};render();
+}
+function kingSkip(){
+ if(!kot||kot.winner||match||pendingStart||kot.queue.length<2)return;
+ kot.queue.push(kot.queue.shift());render();
+}
+function kingStart(){
+ if(onlineNavRole!=='admin'||!kot||kot.winner||!kot.current||match)return;
+ const [a,b]=kot.current;
+ // Existing friendly-style persistence and first-throw selection.
+ startMatch(a,b,'king');
+}
+async function loadKotWinners(){
+ if(kotWinnersLoading||onlineNavRole!=='admin')return;
+ kotWinnersLoading=true;kotWinnersError='';
+ try{const {client}=await cloudUser();const {data,error}=await client.from('ruefner_kot_winners').select('winner,completed_at').order('completed_at',{ascending:false}).limit(100);
+  if(error)throw error;kotWinnersOnline=data||[];
+ }catch(e){kotWinnersError='King-Historie noch nicht verfügbar: '+(e.message||e);}
+ finally{kotWinnersLoading=false;if(view==='king')render();}
+}
+async function kotRecordWin(g){
+ if(!kot||!kot.current||!kot.current.includes(g.winner))return;
+ const loser=kot.current.find(x=>x!==g.winner);
+ kot.streak=kot.champion===g.winner?kot.streak+1:1;
+ kot.champion=g.winner;kot.matches++;
+ kot.winIds=kot.streak===1?[g.id]:[...(kot.winIds||[]),g.id].slice(-3);
+ if(kot.streak>=3){
+  // Sieger wird erst nach erfolgreichem, serverseitig geprüften Archivieren bestätigt.
+  const {client}=await cloudUser();
+  const {error}=await client.rpc('ruefner_kot_finish',{p_winner:cloudId(g.winner),p_match_ids:kot.winIds,p_tournament_id:kot.tournamentId});
+  if(error)throw Error('King-Sieger konnte nicht online archiviert werden: '+error.message);
+  kot.winner=g.winner;kot.current=null;kotWinnersError='';await loadKotWinners();
+ }else{kot.queue.push(loser);kot.current=[g.winner,kot.queue.shift()];}
+}
+function kingAbort(){
+ if(!kot)return;
+ showAppConfirm('Durchgang abbrechen? Bereits abgeschlossene Einzelspiele bleiben in der Statistik. Kein Eintrag in der King-Historie.',()=>{kot=null;go('home')});
+}
+function kingReset(){kot=null;render();}
 function training(){return `<div class="section"><h2>🤖 Training</h2><p class="muted">Privat. Nur dein höchster besiegter Rüfner 3000 wird gespeichert.</p></div><div class="panel"><div class="field"><label>Schwierigkeit</label><select id="difficulty"><option value="0">Anfänger</option><option value="1">Amateur</option><option value="2">Fortgeschritten</option><option value="3">Profi</option><option value="4">Legende</option><option value="5">Unbesiegbar</option></select></div><div class="field"><label>Becher zusammenstellen</label><select id="trainingRerack"><option value="no">Ohne Zusammenstellen</option><option value="yes">Mit Zusammenstellen</option></select></div>${btn('Training starten','startTraining()')}</div>`}
 
 // Online-Spielerverzeichnis (V2.2): Nur für angemeldete Benutzer.
@@ -439,7 +499,7 @@ const ACHIEVEMENTS=[
  ['🦾','Bezwinger des Unbesiegbaren','Rüfner 3000 auf Unbesiegbar besiegen'],
  ['🗡️','Doppelter Todesstoss','Triff die letzten 2 Becher mit deinen beiden Würfen.'],
  ['⚰️','Vierer-Todesstoss','Entferne die letzten 4 Becher mit einer Bombe.'],
- ['🪑','King of the Table','Drei Spiele hintereinander im King-of-the-Table-Modus gewinnen (in einem späteren Update verfügbar)'],
+ ['🪑','King of the Table','Drei Spiele hintereinander im King-of-the-Table-Modus gewinnen'],
  ['🔗','Kombinationskönig','Mindestens 2 echte Kombinationen in einem Spiel erzielen, auch in derselben Aufnahme. Trickshots zählen nicht.'],
  ['🦆','Gummiente','Verfehle 15 Würfe hintereinander.'],
  ['💀','Hinrichtung','Gewinne ein Spiel, während dein Gegner noch mindestens 8 Becher hat.'],
@@ -453,7 +513,7 @@ function achievementRowsFor(pid){
  const p=db.players.find(p=>p.onlineId===pid),records=allOnlineStatResults()
   .filter(g=>g.player_a===pid||g.player_b===pid)
   .sort((a,b)=>new Date(a.played_at)-new Date(b.played_at));
- const got=new Set();let streak=0,coldStreak=0,lossStreak=0,clownStreak=0;
+ const got=new Set();if(kotWinnersOnline.some(w=>w.winner===pid))got.add(30);let streak=0,coldStreak=0,lossStreak=0,clownStreak=0;
  for(const g of records){
   const isA=g.player_a===pid,s=isA?g.side_a:g.side_b,o=isA?g.side_b:g.side_a;
   if(!s||!o)continue;
@@ -554,12 +614,13 @@ async function saveFriendlyOnline(g){
  const a=cloudId(g.a),b=cloudId(g.b),winner=cloudId(g.winner);
  if(!a||!b||!winner)throw Error('Beide Spieler müssen registrierte Online-Profile sein. Bitte Spielerauswahl aktualisieren.');
  const {client,user}=await cloudUser();
- if(user.id!==a&&user.id!==b)throw Error('Nur ein beteiligter Spieler darf das Ergebnis online speichern. Bitte mit Dario oder dem Gegner anmelden.');
+ if(g.kind==='king'&&(!kot?.tournamentId||!kot.current||kot.current[0]!==g.a||kot.current[1]!==g.b))throw Error('King-Turnierstatus fehlt oder Teilnehmer stimmen nicht überein.');
+ if(g.kind!=='king'&&user.id!==a&&user.id!==b)throw Error('Nur ein beteiligter Spieler darf das Ergebnis online speichern.');
  const payload={
   client_match_id:g.id,player_a:a,player_b:b,winner,recorded_by:user.id,
   played_at:g.date,side_a:g.sides[0],side_b:g.sides[1]
  };
- const {error}=await client.from('ruefner_match_results').insert(payload);
+ const {error}=g.kind==='king' ? await client.rpc('ruefner_kot_save_match',{p_client_match_id:g.id,p_player_a:a,p_player_b:b,p_winner:winner,p_played_at:g.date,p_side_a:g.sides[0],p_side_b:g.sides[1],p_tournament_id:kot?.tournamentId,p_round_number:(kot?.matches||0)+1}) : await client.from('ruefner_match_results').insert(payload);
  if(error&&error.code!=='23505')throw error;
  // A duplicate ID is not proof that this exact result was stored: verify it.
  if(error?.code==='23505'){
@@ -596,9 +657,9 @@ function startMatch(a,b,kind,ref=null,difficulty=0,trainingRerack=true){
 function firstThrow(){
  if(!pendingStart)return `<div class="notice">Kein Spiel ausgewählt.</div>${btn('Zurück',"go('home')")}`;
  const {a,b,kind}=pendingStart;
- return `<div class="section"><h2>🎯 Wer beginnt?</h2><p class="muted">${kind==='league'?'Premier League':'Freundschaftsspiel'} · ${esc(name(a))} gegen ${esc(name(b))}</p></div><div class="panel"><p>Wähle, wer den ersten Wurf macht:</p><div class="row">${btn(esc(name(a))+' beginnt','chooseFirstThrow(0)')}${btn(esc(name(b))+' beginnt','chooseFirstThrow(1)')}</div><p>${btn('Abbrechen',"cancelFirstThrow()",'secondary')}</p></div>`;
+ return `<div class="section"><h2>🎯 Wer beginnt?</h2><p class="muted">${kind==='league'?'Premier League':kind==='king'?'King of the Table':'Freundschaftsspiel'} · ${esc(name(a))} gegen ${esc(name(b))}</p></div><div class="panel"><p>Wähle, wer den ersten Wurf macht:</p><div class="row">${btn(esc(name(a))+' beginnt','chooseFirstThrow(0)')}${btn(esc(name(b))+' beginnt','chooseFirstThrow(1)')}</div><p>${btn('Abbrechen',"cancelFirstThrow()",'secondary')}</p></div>`;
 }
-function cancelFirstThrow(){const kind=pendingStart?.kind;pendingStart=null;go(kind==='league'?'league':'friendship')}
+function cancelFirstThrow(){const kind=pendingStart?.kind;pendingStart=null;go(kind==='league'?'league':kind==='king'?'king':'friendship')}
 function chooseFirstThrow(side){
  if(!pendingStart||![0,1].includes(side))return;
  const {a,b,kind,ref,difficulty}=pendingStart;pendingStart=null;
@@ -960,7 +1021,7 @@ async function finishMatch(){
   achievementMissStreak15:s.achievementMissStreak15,achievementMissedMatchballs:s.achievementMissedMatchballs,reracked:s.reracked,
   achievementFirstHitDone:s.achievementFirstHitDone,
   achievementOpeningOpponentThrows:match.sides[1-i].shots===0}))};
- if(g.kind==='friendly'||g.kind==='league'){
+ if(g.kind==='friendly'||g.kind==='league'||g.kind==='king'){
   cloudSaving=true;render();
   try{if(g.kind==='league')await savePlOnline(g);else await saveFriendlyOnline(g);}
   catch(e){cloudSaving=false;render();showAppAlert('Online-Speichern fehlgeschlagen: '+(e.message||'Unbekannter Fehler')+'\nDas Spiel ist noch offen. Bitte erneut versuchen.');return;}
@@ -993,9 +1054,9 @@ async function finishMatch(){
    }
   }
  }
- save();completedMatchSummary=g;match=null;go('matchSummary');
+ save();if(g.kind==='king'){try{await kotRecordWin(g)}catch(e){showAppAlert('Einzelmatch wurde gespeichert, aber die King-Historie konnte nicht abgeschlossen werden: '+e.message+'\nBitte nicht erneut spielen, bevor wir das geprüft haben.');return;}}completedMatchSummary=g;match=null;go('matchSummary');
 }
-function closeMatchSummary(){const kind=completedMatchSummary?.kind;completedMatchSummary=null;go(kind==='training'?'home':kind==='league'?'league':'stats')}
+function closeMatchSummary(){const kind=completedMatchSummary?.kind;completedMatchSummary=null;go(kind==='training'?'home':kind==='league'?'league':kind==='king'?'king':'stats')}
 function matchSummaryPage(){
  const g=completedMatchSummary;if(!g)return `<div class="panel">Keine Spielzusammenfassung vorhanden.</div>${btn('Zum Menü',"go('home')")}`;
  const a=g.sides[0],b=g.sides[1];
@@ -1201,7 +1262,7 @@ function stats(){
 function rules(){const sections=[['Aufstellen','10 Becher in Pyramidenform (4–3–2–1), mittig und ca. 10 cm von der Tischkante.'],['Anspiel','Ein Team beginnt mit zwei Würfen. Bei Uneinigkeit: Schere, Stein, Papier.'],['Werfen','Pro Team zwei Bälle pro Runde. Der Ellenbogen bleibt hinter der Tischkante.'],['Abwehren','Nicht direkte Würfe dürfen abgewehrt werden; direkte Würfe nicht. Bälle im Becher dürfen nicht herausgeblasen werden.'],['Kombinationen','Zwei unterschiedliche Becher: beide weg und zwei neue Würfe. Derselbe Becher: Bombe, dieser und drei nächstgelegene Becher weg, danach zwei neue Würfe.'],['Trickshot','Kommt der Ball ohne Fremdeinwirkung über die Tischmitte zurück, gibt es einen Trickshot.'],['Death Cup','Treffer in einen bereits getroffenen, aber noch stehenden Becher beendet das Spiel sofort.'],['Eigentor & umfallende Becher','Eigentore und umgefallene Becher haben eigene Strafregeln.'],['Island','Steht ein gegnerischer Becher allein, darf vor dem Wurf Island angesagt werden. Treffer: Gegner wählt einen zusätzlichen Becher zum Entfernen. Fehlwurf oder falscher Becher: ein eigener Becher wird entfernt. Island kann mit Kombinationen und Bomben kombiniert werden.'],['Zusammenstellen','Einmal pro Spiel, zu Beginn eines regulären eigenen Wurfs – niemals während einer Kombination oder ihrer Zusatzwürfe. Bei 6 Bechern grosse Pyramide; 5 Full House (3 Varianten); 4 Vagina; 3 kleine Pyramide; 2 Paar (3 Varianten).'],['Trinken','Getroffene Becher werden ausgetrunken; die Originalregeln enthalten zusätzliche Zeit- und Strafbestimmungen.']];return `<div class="section"><h2>📖 Rüfner Beer Pong Reglement</h2><p class="muted">Kurzübersicht. Das vollständige Originaldokument liegt der App bei.</p></div>${sections.map(([h,p])=>`<details><summary>${h}</summary><p>${p}</p></details>`).join('')}<div class="panel"><a class="btn" style="display:inline-block;text-decoration:none" href="reglement.pdf" target="_blank" rel="noopener">📄 Vollständiges Reglement (PDF)</a></div>`}
 window.history.replaceState({ruefnerView:'home'},'','#home');
 render();
-if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('./sw.js?v=40').catch(()=>{});
+if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('./sw.js?v=41').catch(()=>{});
 
 // V2.8: Authentifizierte Rolle steuert die Online-Navigation, nicht das lokale Host-Profil.
 (async function syncOnlineNavigation(){
