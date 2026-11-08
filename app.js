@@ -183,17 +183,38 @@ function kingPage(){
  if(!onlineDirectoryLoaded&&!onlineDirectoryLoading)setTimeout(loadOnlinePlayers,0);
  if(!kotWinnersLoading&&!kotWinnersOnline.length&&!kotWinnersError)setTimeout(loadKotWinners,0);
  if(!kot){
-  const ps=db.players.filter(p=>p.onlineId&&!p.isDeleted);
-  return `<div class="section"><h2>👑 King of the Table</h2><p class="muted">Admin-Test · Einzelspiele zählen wie Freundschaftsspiele.</p></div><div class="panel"><h3>Teilnehmer wählen (mindestens 3)</h3>${ps.map(p=>`<label style="display:block;margin:10px 0"><input type="checkbox" class="kot-player" value="${esc(p.id)}"> ${esc(p.name)}</label>`).join('')}${btn('Turnier starten','kingCreate()')}</div>`;
+  const ps=db.players.filter(p=>p.onlineId&&!p.isDeleted).filter((p,i,arr)=>arr.findIndex(q=>q.onlineId===p.onlineId)===i);
+  const max=ps.length;
+  if(!ui.kingCount)ui.kingCount=Math.min(3,max);
+  const count=Math.min(ui.kingCount,max);
+  const opts=(selected)=>ps.map(p=>`<option value="${esc(p.id)}" ${p.id===selected?'selected':''}>${esc(p.name)}</option>`).join('');
+  const selected=Array.isArray(ui.kingSelected)?ui.kingSelected:[];
+  const pickers=Array.from({length:count},(_,i)=>{
+   const color=i===0?'#69baff':i===1?'#ff788e':'#c0d0d8';
+   const pid=selected[i]&&ps.some(p=>p.id===selected[i])?selected[i]:ps[i]?.id;
+   return `<div class="field"><label style="color:${color};font-weight:800">Spieler ${i+1}${i>1?' · Warteschlange':''}</label><select class="kot-player-select" data-slot="${i}" onchange="kingSelectionChanged()">${opts(pid)}</select></div>`;
+  }).join('');
+  return `<div class="section"><h2>👑 King of the Table</h2><p class="muted">Admin-Test · Einzelspiele zählen wie Freundschaftsspiele.</p></div><div class="panel"><h3>Teilnehmer wählen (mindestens 3)</h3>${onlineDirectoryLoading?'<p class="muted">Online-Spieler werden geladen …</p>':''}${pickers}<div class="row" style="margin:12px 0">${count<max?btn('＋ Spieler hinzufügen','kingAddPlayer()','secondary'):''}${count>3?btn('− Letzten Spieler entfernen','kingRemovePlayer()','secondary'):''}</div>${btn('Turnier starten','kingCreate()')}</div>`;
  }
  const active=kot.current?`<p>Aktuell: <strong>${esc(name(kot.current[0]))} gegen ${esc(name(kot.current[1]))}</strong></p>${btn('Match starten','kingStart()')}`:'';
  return `<div class="section"><h2>👑 King of the Table</h2><p class="muted">Admin-Test · Drei Siege in Folge gewinnen.</p></div><div class="panel">${kot.winner?`<h2>👑 ${esc(name(kot.winner))} ist King of the Table!</h2>`:active}<p>Aktuelle Siegesserie: ${kot.streak} · Gespielte Matches: ${kot.matches}</p><h3>Warteschlange</h3><p>${kot.queue.map(x=>esc(name(x))).join(' → ')||'–'}</p>${!kot.winner&&kot.current&&kot.queue.length?btn('⏭ Nächsten Spieler überspringen','kingSkip()','secondary'):''}${kot.winner?btn('Neuen Durchgang','kingReset()'):btn('Durchgang abbrechen','kingAbort()','danger')}</div>${kotWinnersOnline.length?`<div class="panel"><h3>Abgeschlossene Durchgänge (online)</h3>${kotWinnersOnline.map(w=>`<p>👑 ${esc(plName(plLocalId(w.winner)))} · ${esc(new Date(w.completed_at).toLocaleDateString('de-CH'))}</p>`).join('')}</div>`:''}${kotWinnersError?`<p class="notice">${esc(kotWinnersError)}</p>`:''}`;
 }
+function kingSelectionChanged(){ui.kingSelected=[...document.querySelectorAll('.kot-player-select')].map(x=>x.value);}
+function kingAddPlayer(){
+ kingSelectionChanged();
+ const available=db.players.filter(p=>p.onlineId&&!p.isDeleted).filter((p,i,arr)=>arr.findIndex(q=>q.onlineId===p.onlineId)===i);
+ if((ui.kingCount||3)>=available.length)return;
+ ui.kingCount=(ui.kingCount||3)+1;
+ const unused=available.find(p=>!ui.kingSelected.includes(p.id));
+ ui.kingSelected.push(unused?.id||available[ui.kingCount-1]?.id);
+ render();
+}
+function kingRemovePlayer(){kingSelectionChanged();if((ui.kingCount||3)<=3)return;ui.kingCount--;ui.kingSelected.pop();render();}
 function kingCreate(){
  if(onlineNavRole!=='admin')return;
- const ids=[...document.querySelectorAll('.kot-player:checked')].map(x=>x.value);
+ const ids=[...document.querySelectorAll('.kot-player-select')].map(x=>x.value);
  if(ids.length<3)return showAppAlert('Mindestens drei registrierte Spieler auswählen.');
- if(new Set(ids).size!==ids.length)return;
+ if(new Set(ids).size!==ids.length)return showAppAlert('Jeder Spieler darf nur einmal ausgewählt werden. Bitte unterschiedliche Spieler wählen.');
  kot={tournamentId:crypto.randomUUID(),current:[ids[0],ids[1]],queue:ids.slice(2),champion:null,streak:0,matches:0,winner:null,winIds:[]};render();
 }
 function kingSkip(){
