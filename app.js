@@ -18,7 +18,7 @@ const formationPatterns={
 const variantNames={6:['Grosse Pyramide'],5:['Full House 1','Full House 2','Full House 3'],4:['Vagina'],3:['Kleine Pyramide'],2:['Paar 1','Paar 2','Paar 3']};
 let db=load(),view='home',match=null,ui={},pendingStart=null,completedMatchSummary=null;
 let kot=null; // Admin-Test; nur abgeschlossene Einzelmatches werden online gespeichert.
-let kotWinnersOnline=[],kotWinnersLoading=false,kotWinnersError='';
+let kotWinnersOnline=[],kotWinnersLoading=false,kotWinnersLoaded=false,kotWinnersError='';
 const KOT_RELEASE='21.12.2026';
 let selectedProfileId=null,profileZoom=false,profileStatusSaving=false,profileStatusEditor=false;
 let trickFlashTimer=null;
@@ -181,7 +181,7 @@ function requireProfile(){if(!onlineUserId||!db.players.some(p=>p.id===db.curren
 function kingPage(){
  if(onlineNavRole!=='admin')return '<div class="panel">🔒 Ab 21.12.2026</div>';
  if(!onlineDirectoryLoaded&&!onlineDirectoryLoading)setTimeout(loadOnlinePlayers,0);
- if(!kotWinnersLoading&&!kotWinnersOnline.length&&!kotWinnersError)setTimeout(loadKotWinners,0);
+ if(!kotWinnersLoaded&&!kotWinnersLoading)setTimeout(loadKotWinners,0);
  if(!kot){
   const ps=db.players.filter(p=>p.onlineId&&!p.isDeleted).filter((p,i,arr)=>arr.findIndex(q=>q.onlineId===p.onlineId)===i);
   const max=ps.length;
@@ -228,12 +228,12 @@ function kingStart(){
  startMatch(a,b,'king');
 }
 async function loadKotWinners(){
- if(kotWinnersLoading||onlineNavRole!=='admin')return;
+ if(kotWinnersLoading||kotWinnersLoaded||onlineNavRole!=='admin')return;
  kotWinnersLoading=true;kotWinnersError='';
  try{const {client}=await cloudUser();const {data,error}=await client.from('ruefner_kot_winners').select('winner,completed_at').order('completed_at',{ascending:false}).limit(100);
   if(error)throw error;kotWinnersOnline=data||[];
  }catch(e){kotWinnersError='King-Historie noch nicht verfügbar: '+(e.message||e);}
- finally{kotWinnersLoading=false;if(view==='king')render();}
+ finally{kotWinnersLoaded=true;kotWinnersLoading=false;if(view==='king')render();}
 }
 async function kotRecordWin(g){
  if(!kot||!kot.current||!kot.current.includes(g.winner))return;
@@ -246,7 +246,7 @@ async function kotRecordWin(g){
   const {client}=await cloudUser();
   const {error}=await client.rpc('ruefner_kot_finish',{p_winner:cloudId(g.winner),p_match_ids:kot.winIds,p_tournament_id:kot.tournamentId});
   if(error)throw Error('King-Sieger konnte nicht online archiviert werden: '+error.message);
-  kot.winner=g.winner;kot.current=null;kotWinnersError='';await loadKotWinners();
+  kot.winner=g.winner;kot.current=null;kotWinnersError='';kotWinnersLoaded=false;await loadKotWinners();
  }else{kot.queue.push(loser);kot.current=[g.winner,kot.queue.shift()];}
 }
 function kingAbort(){
