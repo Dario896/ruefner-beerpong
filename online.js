@@ -114,6 +114,66 @@ else {
    root.append(box);
   }
  }
+ const friendlyFields=[['remaining','Verbleibende Becher'],['shots','Würfe'],['hits','Treffer'],['turns','Aufnahmen'],['bombs','Bomben'],['combos','Kombinationen'],['trickAttempts','Trickshotversuche'],['trickHits','Trickshottreffer'],['islandAttempts','Island-Versuche'],['islandHits','Island-Treffer'],['finishAttempts','Finishversuche'],['finishHits','Erfolgreiche Finishes'],['normalFinishes','Normale Finishes'],['comboFinishes','Kombifinishes'],['bombFinishes','Bombenfinishes'],['deathCupFinishes','Death-Cup-Finishes']];
+ async function openFriendlyEditor(game){
+  const root=$('admin-matches');root.replaceChildren();
+  const back=()=>showGames();
+  const heading=el('h3','✏️ Freundschaftsspiel bearbeiten');root.append(heading);
+  root.append(el('p',new Date(game.played_at).toLocaleDateString('de-CH'),'muted'));
+  root.append(button('← Zurück zur Spielübersicht',back));
+  const wait=el('p','Spielstatistiken werden geladen …','muted');root.append(wait);
+  try{
+   // The admin overview may omit the complete side JSON; fetch the actual match.
+   const {data,error}=await client.from('ruefner_match_results').select('side_a,side_b,winner').eq('id',game.id).single();
+   if(error)throw error;
+   wait.remove();
+   const form=el('form');form.style.marginTop='16px';
+   const winnerPanel=el('div',undefined,'panel');winnerPanel.append(el('label','Sieger'));
+   const winner=el('select');
+   for(const id of [game.player_a,game.player_b]){const opt=el('option',label(id));opt.value=id;winner.append(opt)}
+   winner.value=data.winner||game.winner;winnerPanel.append(winner);form.append(winnerPanel);
+   const sideInputs=[];
+   for(const [index,sideKey,playerId] of [[0,'side_a',game.player_a],[1,'side_b',game.player_b]]){
+    const panel=el('div',undefined,'panel');panel.append(el('h3',label(playerId)));
+    const inputs={};const stats=data[sideKey]||{};
+    for(const [key,title] of friendlyFields){
+     const field=el('div',undefined,'field');const lbl=el('label',title);field.append(lbl);
+     const input=el('input');input.type='number';input.min='0';input.max=key==='remaining'?'10':'9999';input.step=key==='turns'?'0.5':'1';input.value=String(Number(stats[key])||0);
+     field.append(input);panel.append(field);inputs[key]=input;
+    }
+    sideInputs.push({inputs,original:stats,side:index===0?'a':'b'});form.append(panel);
+   }
+   const message=el('p','','muted');message.setAttribute('role','status');form.append(message);
+   const save=button('Änderungen speichern',()=>{} ,false);save.type='submit';form.append(save);
+   form.append(button('Abbrechen',back));
+   form.addEventListener('submit',async event=>{
+    event.preventDefault();
+    const updates=[];const values=[];
+    for(const {inputs,original,side} of sideInputs){
+     const stats={};
+     for(const [key] of friendlyFields){
+      const n=Number(inputs[key].value);
+      if(inputs[key].value.trim()===''||!Number.isFinite(n)||n<0||n>(key==='remaining'?10:9999)||(key==='turns'?!Number.isInteger(n*2):!Number.isInteger(n))){message.textContent='Ungültiger Wert bei '+key;return}
+      stats[key]=n;
+      if(n!==(Number(original[key])||0))updates.push({side,key,value:n});
+     }
+     if(stats.hits>stats.shots||stats.trickHits>stats.trickAttempts||stats.islandHits>stats.islandAttempts||stats.finishHits>stats.finishAttempts){message.textContent='Treffer dürfen Versuche nicht übersteigen.';return}
+     values.push(stats);
+    }
+    const changedWinner=winner.value!==(data.winner||game.winner);
+    if(!updates.length&&!changedWinner){message.textContent='Keine Änderungen vorhanden.';return}
+    // This endpoint supports one statistic field per request, unlike PL RPC.
+    // Update only changed fields; report partial completion on a network error.
+    save.disabled=true;message.textContent='Änderungen werden gespeichert …';let completed=0;
+    try{
+     for(const u of updates){await adminAction('edit-stats',{matchId:game.id,side:u.side,stats:{[u.key]:u.value}});completed++}
+     if(changedWinner){await adminAction('edit-winner',{matchId:game.id,winner:winner.value});completed++}
+     await loadAdmin();
+    }catch(e){message.textContent='Speichern unterbrochen ('+completed+' Änderungen übernommen): '+e.message+' – bitte neu laden und prüfen.';save.disabled=false}
+   });
+   root.append(form);
+  }catch(e){wait.textContent='Statistiken konnten nicht geladen werden: '+e.message+' (keine Daten verändert).'}
+ }
  function showGames(){
   const root=$('admin-matches');root.replaceChildren();
   let search=document.getElementById('game-search');
@@ -129,26 +189,7 @@ else {
    const box=el('div',undefined,'notice');
    box.append(el('strong',new Date(g.played_at).toLocaleDateString('de-CH')+' · '+label(g.player_a)+' vs. '+label(g.player_b)+' · 🏆 '+label(g.winner)));
    const actions=el('div',undefined,'row');actions.style.marginTop='8px';
-   actions.append(button('✏️ Sieger ändern',async()=>{
-    const choice=prompt('Sieger: 1 = '+label(g.player_a)+', 2 = '+label(g.player_b));
-    if(choice!=='1'&&choice!=='2')return;
-    try{await adminAction('edit-winner',{matchId:g.id,winner:choice==='1'?g.player_a:g.player_b});await loadAdmin();}
-    catch(e){alert(e.message)}
-   }));
-   actions.append(button('📊 Statistik korrigieren',async()=>{
-    const side=prompt('Welche Seite bearbeiten? a = '+label(g.player_a)+', b = '+label(g.player_b));
-    if(side!=='a'&&side!=='b')return;
-    const field=prompt('Feld: shots, hits, bombs, combos, turns, remaining, trickAttempts, trickHits, finishAttempts, finishHits, normalFinishes, comboFinishes, bombFinishes');
-    const allowed=['shots','hits','bombs','combos','turns','remaining','trickAttempts','trickHits','finishAttempts','finishHits','normalFinishes','comboFinishes','bombFinishes'];
-    if(!allowed.includes(field))return alert('Ungültiges Statistikfeld');
-    const raw=prompt('Neuer Wert für '+field+':');
-    if(raw===null)return;
-    const value=Number(raw);
-    if(!Number.isFinite(value)||value<0)return alert('Ungültiger Wert');
-    if(!confirm('Statistik wirklich korrigieren?'))return;
-    try{await adminAction('edit-stats',{matchId:g.id,side,stats:{[field]:value}});await loadAdmin()}
-    catch(e){alert(e.message)}
-   }));
+   actions.append(button('✏️ Spiel bearbeiten',()=>openFriendlyEditor(g)));
    actions.append(button('🗑️ Löschen',async()=>{
     if(!confirm('Spiel wirklich löschen? Eine Sicherung wird im Admin-Protokoll abgelegt.'))return;
     try{await adminAction('delete-match',{matchId:g.id});await loadAdmin();}

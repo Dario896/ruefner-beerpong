@@ -780,7 +780,7 @@ function finishRegularThrows(){
  const target=boardIndex(),remaining=match.sides[target].cups.length;
  if(hits.length===2&&hits[0].cup===hits[1].cup&&remaining<=4+islandHits){
   const own=match.sides[match.turn];
-  own.bombs++;own.finishAttempts++;own.finishHits++;own.bombFinishes++;own.achievementTurnBombFinishes=(own.achievementTurnBombFinishes||0)+1;
+  own.bombs++;own.finishHits++;own.bombFinishes++;own.achievementTurnBombFinishes=(own.achievementTurnBombFinishes||0)+1;
   // Direkter Bombenfinish: vier Becher zu Beginn der aktuellen Aufnahme,
   // vier durch diese Bombe entfernt. Vor removeCups/checkWin markieren.
   if(remaining===4 && match.achievementTurnStart?.[match.turn]===4 &&
@@ -874,8 +874,16 @@ function tapCup(side,c){
  if(ui.islandActive&&!islandCandidates().includes(c))return;
  snapshot();recordPantsHit(side,c);recordHit(side,c);
 }
+// A second regular throw can finish via combo (2 cups) or bomb (up to 4).
+// Count the opportunity on the throw, including misses, not on resolution.
+function isSecondThrowFinishChance(){
+ if(!match||match.bonusPhase||match.round.length!==1)return false;
+ const first=match.round[0];
+ const remaining=match.sides[boardIndex()].cups.length;
+ return first.cup!==undefined && remaining>=2 && remaining<=4;
+}
 function recordHit(side,c){
- const own=match.sides[match.turn];own.achievementConsecutiveMisses=0;own.achievementTurnHits=(own.achievementTurnHits||0)+1;const lastCup=match.sides[side].cups.length===1;const firstRegular=match.round.length===0&&!match.bonusPhase&&!match.comboActive&&!match.comboBonusThrows;own.shots++;own.hits++;if(ui.islandActive){own.islandAttempts++;own.islandHits++;}if(lastCup){own.finishAttempts++;own.finishHits++;own.normalFinishes++;if(firstRegular)match.halfTurnWinner=match.turn;}if(match.bonusPhase){own.trickAttempts++;own.trickHits++;}
+ const own=match.sides[match.turn];own.achievementConsecutiveMisses=0;own.achievementTurnHits=(own.achievementTurnHits||0)+1;const lastCup=match.sides[side].cups.length===1;const secondFinish=isSecondThrowFinishChance();const firstRegular=match.round.length===0&&!match.bonusPhase&&!match.comboActive&&!match.comboBonusThrows;own.shots++;own.hits++;if(secondFinish)own.finishAttempts++;if(ui.islandActive){own.islandAttempts++;own.islandHits++;}if(lastCup){own.finishAttempts++;own.finishHits++;own.normalFinishes++;if(firstRegular)match.halfTurnWinner=match.turn;}if(match.bonusPhase){own.trickAttempts++;own.trickHits++;}
  if(match.bonusPhase){removeCups(side,[c]);finishTrick();return}
  const island=!!ui.islandActive;ui.islandActive=false;
  if(match.comboBonusThrows>0)match.comboBonusThrows--;match.round.push({side,cup:c,island});
@@ -905,7 +913,7 @@ function missShot(){
   match.sides[match.turn].achievementMissStart++;
   if(match.sides[match.turn].achievementMissStart>=8)match.sides[match.turn].achievementColdStart=true;
  }
- match.sides[match.turn].shots++;if(ui.islandActive)match.sides[match.turn].islandAttempts++;if(match.sides[boardIndex()].cups.length===1)match.sides[match.turn].finishAttempts++;if(match.bonusPhase)match.sides[match.turn].trickAttempts++;
+ match.sides[match.turn].shots++;if(isSecondThrowFinishChance()||match.sides[boardIndex()].cups.length===1)match.sides[match.turn].finishAttempts++;if(ui.islandActive)match.sides[match.turn].islandAttempts++;if(match.bonusPhase)match.sides[match.turn].trickAttempts++;
  if(match.bonusPhase){finishTrick();return}
  const island=!!ui.islandActive;ui.islandActive=false;
  if(match.comboBonusThrows>0)match.comboBonusThrows--;match.round.push({miss:true,island});
@@ -913,7 +921,7 @@ function missShot(){
 }
 function resolveRound(){const r=match.round,side=boardIndex(),own=match.sides[match.turn];if(r.length!==2)return;const hits=r.filter(q=>q.cup!==undefined);if(hits.length===2&&hits[0].cup===hits[1].cup){own.bombs++;if(match.sides[side].cups.length<=4){own.finishAttempts++;own.finishHits++;own.bombFinishes++;own.achievementTurnBombFinishes=(own.achievementTurnBombFinishes||0)+1;
   if(match.sides[side].cups.length===4&&match.achievementTurnStart[match.turn]===4)own.achievementFourFinish=true; // Genau vier Becher zu Beginn und beim Bombentreffer
- }const c=hits[0].cup,origin=match.sides[side].positions[c];removeCups(side,[c]);if(match.sides[side].cups.length<=3){removeCups(side,[...match.sides[side].cups]);afterBomb();return}const remaining=3;if(remaining){match.pending={side,origin,remaining,allowed:[]};settleBomb();if(match.pending&&match.kind==='training'&&side===1){autoBomb();return}render();return}afterBomb();return}if(hits.length===2){own.combos++;if(match.sides[side].cups.length===2){own.finishAttempts++;own.finishHits++;own.comboFinishes++;
+ }const c=hits[0].cup,origin=match.sides[side].positions[c];removeCups(side,[c]);if(match.sides[side].cups.length<=3){removeCups(side,[...match.sides[side].cups]);afterBomb();return}const remaining=3;if(remaining){match.pending={side,origin,remaining,allowed:[]};settleBomb();if(match.pending&&match.kind==='training'&&side===1){autoBomb();return}render();return}afterBomb();return}if(hits.length===2){own.combos++;if(match.sides[side].cups.length===2){own.finishHits++;own.comboFinishes++;
   if(match.achievementTurnStart[match.turn]===2&&!match.comboActive&&!match.comboBonusThrows)own.achievementComboFinish=true;
  }match.comboActive=true;match.comboBonusThrows=2;ui.rerack=false;removeCups(side,hits.map(q=>q.cup));match.round=[];if(checkWin())return;render();if(isComTurn())setTimeout(computerTurn,300);return}if(hits.length)removeCups(side,[hits[0].cup]);afterNormalRound()}
 function afterBomb(){if(checkWin())return;match.round=[];match.bonus=false;match.comboActive=true;match.comboBonusThrows=2;ui.rerack=false;render();if(isComTurn())setTimeout(computerTurn,350)}
