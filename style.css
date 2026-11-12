@@ -387,3 +387,9 @@
 .live-stats-table th.live-stats-player.is-throwing.red .avatar{box-shadow:0 0 0 2px #ff808e,0 0 16px #ff4d6c}
 .live-stats-table th.live-stats-player.is-throwing.red span{color:#ff9ca9;text-shadow:0 0 10px #ff5a72aa}
 @media(max-width:450px){.live-stats-heading{gap:7px;padding:12px 10px}.live-match-duration{font-size:12px}.live-stats-heading h2{font-size:16px}.live-stats-badge{padding:4px 7px}}
+
+/* Player photos left aligned above names in both statistics views */
+.live-stats-table th.live-stats-player,.summary-player{text-align:left;vertical-align:top;padding-top:6px}
+.live-stats-table th.live-stats-player .avatar,.summary-player .avatar{display:block;margin:0 0 13px 0}
+.live-stats-table th.live-stats-player span,.summary-player span{display:block;line-height:1.45}
+.summary-player .avatar{margin-bottom:13px}
