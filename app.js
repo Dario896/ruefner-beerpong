@@ -136,7 +136,7 @@ function profiles(){
  if(!onlineDirectoryLoaded&&!onlineDirectoryLoading&&!onlineDirectoryError)setTimeout(loadOnlinePlayers,0);
  if(!onlineUserId)return `<div class="section"><h2>👥 Spielerprofile</h2></div><div class="notice">Bitte zuerst online anmelden.</div>${btn('🔐 Anmelden',"location.href='online.html'")}`;
  const players=db.players.filter(p=>p.onlineId&&!p.isDeleted).filter((p,i,arr)=>arr.findIndex(x=>x.onlineId===p.onlineId)===i).sort((a,b)=>a.name.localeCompare(b.name,'de'));
- return `<div class="section"><h2>👥 Spielerprofile</h2><p class="muted">Alle registrierten Spieler · Profil antippen, um mehr zu sehen.</p></div>${onlineDirectoryError?`<div class="notice">${esc(onlineDirectoryError)}</div>`:''}${onlineDirectoryLoading?'<p class="muted">Spieler werden geladen …</p>':''}<div class="profile-directory">${players.map(p=>`<button class="profile-list-card" onclick="openPlayerProfile('${esc(p.id)}')">${avatar(p.id)}<span class="profile-list-name">${esc(p.name)} ${reigningChampion()===p.id?'👑':''}</span><span class="profile-list-arrow">›</span></button>`).join('')}</div>${btn('↻ Profile aktualisieren','reloadOnlinePlayers()','secondary')}`;
+ return `<div class="section"><h2>👥 Spielerprofile</h2><p class="muted">Alle registrierten Spieler · Profil antippen, um mehr zu sehen.</p></div>${onlineDirectoryError?`<div class="notice">${esc(onlineDirectoryError)}</div>`:''}${onlineDirectoryLoading?'<p class="muted">Spieler werden geladen …</p>':''}<div class="profile-directory">${players.map(p=>`<button class="profile-list-card" onclick="openPlayerProfile('${esc(p.id)}')">${avatar(p.id)}<span class="profile-list-name">${esc(p.name)} ${reigningChampion()===p.id?'👑':''}</span><span class="profile-list-arrow">›</span></button>`).join('')}</div>`;
 }
 function profileDetail(){
  const p=player(selectedProfileId);
@@ -461,7 +461,7 @@ async function loadCloudResults(force=false){
 }
 function refreshCloudResults(){cloudResultsLoaded=false;loadCloudResults(true);}
 // V2.8: Rollierende Statistikzeiträume. 'Letztes Jahr' bedeutet 365 Tage.
-let statsPeriod='30';
+let statsPeriod='365';
 function inStatsPeriod(date){
  if(statsPeriod==='all')return true;
  const t=Date.parse(date);
