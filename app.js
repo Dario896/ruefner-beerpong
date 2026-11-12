@@ -543,7 +543,7 @@ const ACHIEVEMENTS=[
  ['🤡','Clown des Abends','Verliere 3 Spiele hintereinander mit jeweils unter 20 % Trefferquote.'],
  ['🚑','Intensivstation','Verliere ein Spiel nach mindestens 10 vergebenen Matchbällen.'],
  ['🪣','Eimerweise daneben','Verfehle mindestens 50 Würfe in einem Spiel.'],
- ['🏝️','Island-König','Beende ein Match mit einem angesagten Islander, der die letzten zwei gegnerischen Becher entfernt.']
+ ['🔱','Island-König','Beende ein Match mit einem angesagten Islander, der die letzten zwei gegnerischen Becher entfernt.']
 ];
 function achievementRowsFor(pid){
  const p=db.players.find(p=>p.onlineId===pid),records=allOnlineStatResults()
