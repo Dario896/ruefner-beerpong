@@ -79,6 +79,12 @@ function openPlayerProfile(pid){
 function closeProfileZoom(){profileZoom=false;render()}
 function openProfileZoom(){profileZoom=true;render()}
 window.addEventListener('popstate',()=>{
+ // Device/browser Back closes the live statistics overlay without leaving the match.
+ if(view==='game'&&match&&liveStatsOpen){
+  window.history.pushState({ruefnerView:'game'},'','#game');
+  closeLiveStats();
+  return;
+ }
  if(profileZoom){profileZoom=false;window.history.pushState({ruefnerView:view,profileId:selectedProfileId},'','#'+view);render();return;}
  if(appDialog){appDialog=null;window.history.pushState({ruefnerView:view,profileId:selectedProfileId},'','#'+view);render();return;}
  if(view==='game'&&match){
@@ -698,7 +704,7 @@ function chooseFirstThrow(side){
  }else beginMatch(a,b,kind,ref,difficulty,side);
 }
 function beginMatch(a,b,kind,ref,difficulty,firstTurn,trainingRerack=true){
- match={id:id(),a,b,kind,ref,difficulty,trainingRerack,sides:[newSide(),newSide()],turn:firstTurn,round:[],pending:null,bonus:false,comboActive:false,comboBonusThrows:0,tricks:0,bonusPhase:false,bonusType:null,awaitingTrick:false,finished:false,log:[],undo:[],pants:[{firstHit:false,down:false},{firstHit:false,down:false}]};
+ match={id:id(),startedAt:Date.now(),a,b,kind,ref,difficulty,trainingRerack,sides:[newSide(),newSide()],turn:firstTurn,round:[],pending:null,bonus:false,comboActive:false,comboBonusThrows:0,tricks:0,bonusPhase:false,bonusType:null,awaitingTrick:false,finished:false,log:[],undo:[],pants:[{firstHit:false,down:false},{firstHit:false,down:false}]};
  match.sides[firstTurn].turns=1;
  match.achievementTurnStart=[10,10];window.history.pushState({ruefnerView:'game'},'','#game');view='game';render();if(isComTurn())computerTurn();
 }
@@ -946,7 +952,7 @@ function checkWin(){
    attacker.achievementFourFinish=true;
  }
 
- ui.trickFlash=null;clearTimeout(trickFlashTimer);match.finished=true;match.winner=match.sides[0].cups.length===0&&match.sides[1].cups.length===0?[match.a,match.b][match.turn]:(match.sides[0].cups.length===0?match.b:match.a);
+ ui.trickFlash=null;clearTimeout(trickFlashTimer);match.finished=true;match.endedAt=Date.now();match.winner=match.sides[0].cups.length===0&&match.sides[1].cups.length===0?[match.a,match.b][match.turn]:(match.sides[0].cups.length===0?match.b:match.a);
  match.round=[];match.pending=null;match.islandChoice=null;match.islandQueue=[];ui.islandActive=false;match.bonus=false;match.tricks=0;match.bonusPhase=false;match.awaitingTrick=false;
  render();return true;
 }
@@ -1033,7 +1039,7 @@ function chooseDeathCupWinner(side){
  if(firstRegular)match.halfTurnWinner=side;
  // Für PL-Endstand, Becherdifferenz und AVG müssen alle Gegnerbecher weg sein.
  loserSide.cups=[];
- match.finished=true;match.winner=[match.a,match.b][side];match.round=[];match.pending=null;match.islandChoice=null;match.islandQueue=[];ui.islandActive=false;match.bonus=false;match.tricks=0;match.bonusPhase=false;match.awaitingTrick=false;match.comboActive=false;
+ match.finished=true;match.endedAt=Date.now();match.winner=[match.a,match.b][side];match.round=[];match.pending=null;match.islandChoice=null;match.islandQueue=[];ui.islandActive=false;match.bonus=false;match.tricks=0;match.bonusPhase=false;match.awaitingTrick=false;match.comboActive=false;
  ui.deathCup=false;render();
 }
 function ownGoal(){if(!match||match.kind==='training'||match.finished||match.pending)return;ui.ownGoal=true;ui.rerack=false;render()}
@@ -1064,7 +1070,7 @@ async function finishMatch(){
   catch(e){cloudSaving=false;render();showAppAlert('Online-Speichern fehlgeschlagen: '+(e.message||'Unbekannter Fehler')+'\nDas Spiel ist noch offen. Bitte erneut versuchen.');return;}
   cloudSaving=false;
  }
- if(g.kind==='league'){completedMatchSummary=g;match=null;go('matchSummary');return;}
+ if(g.kind==='league'){g.displayDurationMs=(match.endedAt||Date.now())-match.startedAt;completedMatchSummary=g;match=null;go('matchSummary');return;}
  if(g.kind==='training'){
   db.trainingAchievements=db.trainingAchievements||{};
   const t=db.trainingAchievements[match.a]||(db.trainingAchievements[match.a]={played:false,unbeatable:false});
@@ -1091,14 +1097,14 @@ async function finishMatch(){
    }
   }
  }
- save();if(g.kind==='king'){try{await kotRecordWin(g)}catch(e){showAppAlert('Einzelmatch wurde gespeichert, aber die King-Historie konnte nicht abgeschlossen werden: '+e.message+'\nBitte nicht erneut spielen, bevor wir das geprüft haben.');return;}}completedMatchSummary=g;match=null;go('matchSummary');
+ save();if(g.kind==='king'){try{await kotRecordWin(g)}catch(e){showAppAlert('Einzelmatch wurde gespeichert, aber die King-Historie konnte nicht abgeschlossen werden: '+e.message+'\nBitte nicht erneut spielen, bevor wir das geprüft haben.');return;}}g.displayDurationMs=(match.endedAt||Date.now())-match.startedAt;completedMatchSummary=g;match=null;go('matchSummary');
 }
 function closeMatchSummary(){const kind=completedMatchSummary?.kind;if(kind==='king'){if(kot?.winner){completedMatchSummary=null;kot=null;go('home');}else kingNextMatch();return;}completedMatchSummary=null;go(kind==='training'?'home':kind==='league'?'league':'stats')}
 function kingNextMatch(){if(!kot||kot.winner||!completedMatchSummary||completedMatchSummary.kind!=='king'||match)return;completedMatchSummary=null;kingStart();}
 function kingSkipFromSummary(){if(!kot||kot.winner||!completedMatchSummary||completedMatchSummary.kind!=='king'||match||kot.queue.length<1)return;const skipped=kot.current[1];kot.current[1]=kot.queue.shift();kot.queue.push(skipped);render();}
 function kingAbortFromSummary(){if(!kot||!completedMatchSummary||completedMatchSummary.kind!=='king')return;showAppConfirm('Durchgang abbrechen? Bereits abgeschlossene Spiele bleiben in der Statistik, aber es gibt keinen Turniersieger.',()=>{completedMatchSummary=null;kot=null;go('home')});}
 // Gemeinsame Berechnung fuer Endstatistik und Live-Ansicht.
-function matchStatisticRows(g){
+function matchStatisticRows(g,live=false){
  const a=g.sides[0],b=g.sides[1];
  const avg=(s,opp)=>s.turns>0?((10-Number(opp.remaining??opp.cups?.length??0))/s.turns).toFixed(2):'–';
  const val=(s,k)=>Number(s[k]||0);
@@ -1116,25 +1122,33 @@ function matchStatisticRows(g){
  ['Island-Versuche',val(a,'islandAttempts'),val(b,'islandAttempts')],['Island-Treffer',val(a,'islandHits'),val(b,'islandHits')],
  ['Island-Trefferquote',formatPct(a.islandHits,a.islandAttempts),formatPct(b.islandHits,b.islandAttempts)]]:[])
  ];
- return rows;
+ return live?rows.filter(([label])=>!['Finishversuche','Erfolgreiche Finishes','Finishquote','Normale Finishes','Kombifinishes','Bombenfinishes','Death-Cup-Finishes'].includes(label)):rows;
 }
+function matchDuration(ms){
+ const seconds=Math.max(0,Math.floor((Number(ms)||0)/1000));
+ return `${String(Math.floor(seconds/60)).padStart(2,'0')}:${String(seconds%60).padStart(2,'0')}`;
+}
+setInterval(()=>{
+ const el=document.getElementById('live-match-duration');
+ if(el&&match&&liveStatsOpen)el.textContent=matchDuration((match.endedAt||Date.now())-match.startedAt);
+},1000);
 let liveStatsOpen=false;
 function openLiveStats(){if(!match)return;liveStatsOpen=true;render();}
 function closeLiveStats(){liveStatsOpen=false;render();}
 function liveStatsMarkup(){
  if(!match||!liveStatsOpen)return '';
  const g={a:match.a,b:match.b,sides:match.sides};
- const rows=matchStatisticRows(g);
+ const rows=matchStatisticRows(g,true);
  const scoreA=Number(match.sides[0].remaining??match.sides[0].cups.length);
  const scoreB=Number(match.sides[1].remaining??match.sides[1].cups.length);
- return `<div class="live-stats-backdrop" role="presentation" onclick="closeLiveStats()"><section class="live-stats-dialog" role="dialog" aria-modal="true" aria-label="Live-Matchstatistik" onclick="event.stopPropagation()"><div class="live-stats-heading"><h2>📊 Match-Statistik</h2><span class="live-stats-badge"><span class="live-stats-dot"></span>LIVE</span><button class="live-stats-close" onclick="closeLiveStats()" aria-label="Statistik schliessen">✕</button></div><div class="live-stats-scroll"><table class="table live-stats-table"><thead><tr><th>${avatar(g.a)}<span>${esc(name(g.a))}</span></th><th class="live-stats-score">${scoreA} : ${scoreB}</th><th>${avatar(g.b)}<span>${esc(name(g.b))}</span></th></tr></thead><tbody>${rows.map(([label,x,y])=>`<tr><td><strong>${esc(x)}</strong></td><td>${esc(label)}</td><td><strong>${esc(y)}</strong></td></tr>`).join('')}</tbody></table></div></section></div>`;
+ return `<div class="live-stats-backdrop" role="presentation" onclick="closeLiveStats()"><section class="live-stats-dialog" role="dialog" aria-modal="true" aria-label="Live-Matchstatistik" onclick="event.stopPropagation()"><div class="live-stats-heading"><h2>📊 Match-Statistik</h2><span class="live-match-duration" id="live-match-duration">${matchDuration((match.endedAt||Date.now())-match.startedAt)}</span><span class="live-stats-badge"><span class="live-stats-dot"></span>LIVE</span><button class="live-stats-close" onclick="closeLiveStats()" aria-label="Statistik schliessen">✕</button></div><div class="live-stats-scroll"><table class="table live-stats-table"><thead><tr><th class="live-stats-player ${match.turn===0?'is-throwing blue':''}">${avatar(g.a)}<span>${esc(name(g.a))}</span></th><th class="live-stats-score">${scoreA} : ${scoreB}</th><th class="live-stats-player ${match.turn===1?'is-throwing red':''}">${avatar(g.b)}<span>${esc(name(g.b))}</span></th></tr></thead><tbody>${rows.map(([label,x,y])=>`<tr><td><strong>${esc(x)}</strong></td><td>${esc(label)}</td><td><strong>${esc(y)}</strong></td></tr>`).join('')}</tbody></table></div></section></div>`;
 }
 function matchSummaryPage(){
  const g=completedMatchSummary;if(!g)return `<div class="panel">Keine Spielzusammenfassung vorhanden.</div>${btn('Zum Menü',"go('home')")}`;
  const a=g.sides[0],b=g.sides[1];
  const rows=matchStatisticRows(g);
  const scoreA=Number(a.remaining||0),scoreB=Number(b.remaining||0);
- return `<div class="section"><h2>📊 Match-Statistik</h2><p class="muted">🏆 ${esc(name(g.winner))} hat gewonnen!</p></div><div class="panel"><div class="table-wrap"><table class="table" style="width:100%;table-layout:fixed;text-align:center"><thead><tr><th style="width:30%;overflow-wrap:anywhere">${avatar(g.a)} ${esc(name(g.a))}</th><th style="width:40%;font-size:1.5em;white-space:nowrap">${scoreA} : ${scoreB}</th><th style="width:30%;overflow-wrap:anywhere">${avatar(g.b)} ${esc(name(g.b))}</th></tr></thead><tbody>${rows.map(([label,x,y])=>`<tr><td><strong>${esc(x)}</strong></td><td style="font-size:.85em">${esc(label)}</td><td><strong>${esc(y)}</strong></td></tr>`).join('')}</tbody></table></div></div><div style="margin:20px 0;text-align:center">${g.kind==='king'&&kot?kot.winner?`<h3>👑 ${esc(name(kot.winner))} ist King of the Table!</h3>${btn('✓ Turnier beenden','closeMatchSummary()')}`:`<p><strong>Nächstes Match: ${esc(name(kot.current[0]))} gegen ${esc(name(kot.current[1]))}</strong></p><div class="row" style="justify-content:center;gap:10px;flex-wrap:wrap">${btn('▶ Nächstes Match starten','kingNextMatch()')}${btn('⏭ Spieler überspringen','kingSkipFromSummary()','secondary')}${btn('Durchgang abbrechen','kingAbortFromSummary()','danger')}</div>`:btn('✓ Statistik schliessen','closeMatchSummary()')}</div>`;
+ return `<div class="section"><h2>📊 Match-Statistik</h2><p class="muted">🏆 ${esc(name(g.winner))} hat gewonnen!</p>${g.displayDurationMs!=null?`<p class="muted">⏱️ Spielzeit: ${matchDuration(g.displayDurationMs)}</p>`:''}</div><div class="panel"><div class="table-wrap"><table class="table" style="width:100%;table-layout:fixed;text-align:center"><thead><tr><th style="width:30%;overflow-wrap:anywhere">${avatar(g.a)} ${esc(name(g.a))}</th><th style="width:40%;font-size:1.5em;white-space:nowrap">${scoreA} : ${scoreB}</th><th style="width:30%;overflow-wrap:anywhere">${avatar(g.b)} ${esc(name(g.b))}</th></tr></thead><tbody>${rows.map(([label,x,y])=>`<tr><td><strong>${esc(x)}</strong></td><td style="font-size:.85em">${esc(label)}</td><td><strong>${esc(y)}</strong></td></tr>`).join('')}</tbody></table></div></div><div style="margin:20px 0;text-align:center">${g.kind==='king'&&kot?kot.winner?`<h3>👑 ${esc(name(kot.winner))} ist King of the Table!</h3>${btn('✓ Turnier beenden','closeMatchSummary()')}`:`<p><strong>Nächstes Match: ${esc(name(kot.current[0]))} gegen ${esc(name(kot.current[1]))}</strong></p><div class="row" style="justify-content:center;gap:10px;flex-wrap:wrap">${btn('▶ Nächstes Match starten','kingNextMatch()')}${btn('⏭ Spieler überspringen','kingSkipFromSummary()','secondary')}${btn('Durchgang abbrechen','kingAbortFromSummary()','danger')}</div>`:btn('✓ Statistik schliessen','closeMatchSummary()')}</div>`;
 }
 function league(){if(!plLoaded&&!plLoading&&!plError)setTimeout(()=>loadPlOnline(),0);const l=db.leagues.filter(x=>x.online).find(x=>!x.closed);return (plError?`<div class="notice">Online-Fehler: ${esc(plError)} ${btn('Erneut versuchen','refreshPlOnline()','secondary')}</div>`:plLoading?'<p class="muted">Premier League wird geladen …</p>':'')+ `<div class="section row between"><h2>🏆 Premier League</h2></div>${!l?`<div class="panel"><h3>Keine aktive Saison</h3><p class="muted">15 Nights und Finalabend.</p>${visibleRole()==='admin'?btn('Saison erstellen','createLeagueForm()'):''}</div>`:leagueDetail(l)}<div class="section"><h2>Saisonarchiv</h2></div>${db.leagues.filter(x=>x.online&&x.closed).map(x=>`<div class="panel"><strong>${esc(x.title)}</strong> ${btn('Ansehen',`showArchived('${x.id}')`,'secondary')}</div>`).join('')||'<p class="muted">Noch keine abgeschlossenen Saisons.</p>'}`}
 function createLeagueForm(){if(visibleRole()!=='admin')return showAppAlert('Nur der Administrator kann eine Saison erstellen.');if(db.leagues.some(l=>l.online&&!l.closed))return showAppAlert('Es läuft bereits eine Saison.');renderLeagueForm()}

@@ -377,3 +377,13 @@
 .live-stats-table th .avatar{vertical-align:middle;margin-right:4px}
 .live-stats-table td:nth-child(2){font-size:.85em;overflow-wrap:anywhere}
 @media(max-width:450px){.matchstack .live-stats-tab{right:3px;padding:12px 6px;font-size:10px;min-height:100px}.live-stats-dialog{max-height:94dvh}.live-stats-table{font-size:12px}.live-stats-table th .avatar{width:25px;height:25px}}
+
+/* Live match statistics: elapsed time and active thrower */
+.live-match-duration{font-variant-numeric:tabular-nums;font-weight:800;font-size:14px;color:#d6e5f2;white-space:nowrap}
+.live-stats-table th.live-stats-player .avatar{display:block;margin:0 auto 10px}
+.live-stats-table th.live-stats-player span{display:block;line-height:1.4}
+.live-stats-table th.live-stats-player.is-throwing.blue .avatar{box-shadow:0 0 0 2px #5fc4ff,0 0 16px #40baff}
+.live-stats-table th.live-stats-player.is-throwing.blue span{color:#6ecaff;text-shadow:0 0 10px #42baffaa}
+.live-stats-table th.live-stats-player.is-throwing.red .avatar{box-shadow:0 0 0 2px #ff808e,0 0 16px #ff4d6c}
+.live-stats-table th.live-stats-player.is-throwing.red span{color:#ff9ca9;text-shadow:0 0 10px #ff5a72aa}
+@media(max-width:450px){.live-stats-heading{gap:7px;padding:12px 10px}.live-match-duration{font-size:12px}.live-stats-heading h2{font-size:16px}.live-stats-badge{padding:4px 7px}}
