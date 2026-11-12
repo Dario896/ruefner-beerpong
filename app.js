@@ -1063,7 +1063,7 @@ async function finishMatch(){
    showAppAlert('Diese Begegnung wurde bereits abgeschlossen oder ist gesperrt.');return;
   }
  }
- const g={id:match.id,date:new Date().toISOString(),a:match.a,b:match.b,winner:match.winner,kind:match.kind,ref:match.ref,sides:match.sides.map((s,i)=>({remaining:s.cups.length,shots:s.shots,hits:s.hits,bombs:s.bombs,combos:s.combos,turns:s.turns-(match.halfTurnWinner===i?.5:0),trickAttempts:s.trickAttempts,trickHits:s.trickHits,islandAttempts:s.islandAttempts,islandHits:s.islandHits,finishAttempts:s.finishAttempts,finishHits:s.finishHits,normalFinishes:s.normalFinishes,comboFinishes:s.comboFinishes,bombFinishes:s.bombFinishes,deathCupFinishes:s.deathCupFinishes||0,islandFinishes:s.islandFinishes||0,
+ const g={id:match.id,date:new Date().toISOString(),a:match.a,b:match.b,winner:match.winner,kind:match.kind,ref:match.ref,difficulty:match.difficulty,sides:match.sides.map((s,i)=>({remaining:s.cups.length,shots:s.shots,hits:s.hits,bombs:s.bombs,combos:s.combos,turns:s.turns-(match.halfTurnWinner===i?.5:0),trickAttempts:s.trickAttempts,trickHits:s.trickHits,islandAttempts:s.islandAttempts,islandHits:s.islandHits,finishAttempts:s.finishAttempts,finishHits:s.finishHits,normalFinishes:s.normalFinishes,comboFinishes:s.comboFinishes,bombFinishes:s.bombFinishes,deathCupFinishes:s.deathCupFinishes||0,islandFinishes:s.islandFinishes||0,
   achievementMaxTurn:s.achievementMaxTurn,achievementFirstTurn:s.achievementFirstTurn,
   achievementLastTurn:s.achievementLastTurn,achievementReceivedSix:s.achievementReceivedSix,
   achievementSix:s.achievementSix,achievementColdStart:s.achievementColdStart,
