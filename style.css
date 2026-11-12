@@ -359,3 +359,21 @@
 
 /* King-of-the-Table-Vorschau für reguläre Spieler */
 .kot-locked{opacity:.46;filter:grayscale(.8);cursor:not-allowed!important;pointer-events:none;}
+
+/* Live-Matchstatistik: rechte Lasche und wiederverwendete Endstatistik */
+.matchstack .live-stats-tab{position:absolute;right:5px;top:50%;transform:translateY(-50%);z-index:15;writing-mode:vertical-rl;transform-origin:center;letter-spacing:1.5px;font-size:12px;font-weight:800;color:#d6f0ff;background:linear-gradient(135deg,#284e6d,#19334c);border:1px solid #6698bd;border-radius:11px;padding:15px 9px;min-height:112px;box-shadow:0 0 13px #3c9ad655;cursor:pointer;touch-action:manipulation}
+.matchstack .live-stats-tab:active{background:#3b7299;box-shadow:0 0 22px #65caffaa}
+.live-stats-backdrop{position:fixed;inset:0;z-index:1200;background:#07111bd9;display:flex;align-items:center;justify-content:center;padding:12px;box-sizing:border-box}
+.live-stats-dialog{width:min(100%,560px);max-height:min(92dvh,850px);background:#172b40;border:1px solid #52718d;border-radius:18px;box-shadow:0 20px 70px #000b;display:flex;flex-direction:column;overflow:hidden;color:#f4f8fc}
+.live-stats-heading{display:flex;align-items:center;gap:10px;padding:15px 14px;border-bottom:1px solid #426078}
+.live-stats-heading h2{font-size:clamp(16px,4vw,21px);margin:0;flex:1}
+.live-stats-badge{display:inline-flex;align-items:center;gap:6px;color:#bbf7d0;background:#166534;border:1px solid #22c55e;border-radius:30px;padding:5px 10px;font-size:11px;font-weight:900;letter-spacing:1px}
+.live-stats-dot{width:7px;height:7px;border-radius:50%;background:#86efac;box-shadow:0 0 8px #86efac}
+.live-stats-close{background:#29465f;border:1px solid #688da9;border-radius:50%;width:34px;height:34px;color:white;font-size:19px;cursor:pointer;flex-shrink:0}
+.live-stats-scroll{overflow:auto;overscroll-behavior:contain;padding:8px 10px 14px}
+.live-stats-table{width:100%;table-layout:fixed;text-align:center;margin:0}
+.live-stats-table th{width:30%;overflow-wrap:anywhere;vertical-align:middle}
+.live-stats-table th:nth-child(2){width:40%}
+.live-stats-table th .avatar{vertical-align:middle;margin-right:4px}
+.live-stats-table td:nth-child(2){font-size:.85em;overflow-wrap:anywhere}
+@media(max-width:450px){.matchstack .live-stats-tab{right:3px;padding:12px 6px;font-size:10px;min-height:100px}.live-stats-dialog{max-height:94dvh}.live-stats-table{font-size:12px}.live-stats-table th .avatar{width:25px;height:25px}}
