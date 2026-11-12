@@ -59,7 +59,7 @@ function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&l
 function player(i){return db.players.find(p=>p.id===i)}
 function name(i){return i==='COM'?'Rüfner 3000':(player(i)?.name||'Unbekannt')}
 function markAvatarVerified(pid){const p=player(pid);if(p&&!p.photoUploaded){p.photoUploaded=true;save();}}
-function avatar(i){const p=player(i),cfg=window.RUEFNER_SUPABASE;const url=p?.onlineId&&cfg?.url?cfg.url+'/storage/v1/object/public/player-avatars/'+encodeURIComponent(p.onlineId)+'/avatar.jpg'+(p.photo?.includes('?v=')?'?v='+encodeURIComponent(p.photo.split('?v=')[1]):''):p?.photo;return `<span class="avatar">${url?`<img src="${esc(url)}" alt="" onload="markAvatarVerified('${esc(i)}')" onerror="this.style.display='none';this.parentElement.textContent='${esc((p?.name||'?').slice(0,1).toUpperCase())}'">`:esc((p?.name||'🤖').slice(0,1).toUpperCase())}</span>`}
+function avatar(i){if(i==='COM')return `<span class="avatar"><img src="ruefner-avatar.jpg" alt="Rüfner 3000"></span>`;const p=player(i),cfg=window.RUEFNER_SUPABASE;const url=p?.onlineId&&cfg?.url?cfg.url+'/storage/v1/object/public/player-avatars/'+encodeURIComponent(p.onlineId)+'/avatar.jpg'+(p.photo?.includes('?v=')?'?v='+encodeURIComponent(p.photo.split('?v=')[1]):''):p?.photo;return `<span class="avatar">${url?`<img src="${esc(url)}" alt="" onload="markAvatarVerified('${esc(i)}')" onerror="this.style.display='none';this.parentElement.textContent='${esc((p?.name||'?').slice(0,1).toUpperCase())}'">`:esc((p?.name||'🤖').slice(0,1).toUpperCase())}</span>`}
 function activeLeague(){return db.leagues.find(l=>!l.closed)}
 function isAdmin(){return db.current===db.admin}
 function reigningChampion(){const finished=db.leagues.filter(l=>l.online&&l.closed&&champion(l)).sort((a,b)=>new Date(b.created)-new Date(a.created));return finished.length?champion(finished[0]):null}
@@ -126,6 +126,7 @@ function acceptAppDialog(){const action=appDialog?.onAccept;appDialog=null;if(ac
 function appDialogMarkup(){if(!appDialog)return '';return `<div class="app-dialog-backdrop" role="dialog" aria-modal="true" aria-label="Hinweis"><div class="app-dialog-card"><div class="app-dialog-icon">${appDialog.type==='confirm'?'⚠️':'🍻'}</div><h2>${appDialog.type==='confirm'?'Bist du sicher?':'Hinweis'}</h2><p>${esc(appDialog.message).replace(/\n/g,'<br>')}</p><div class="app-dialog-buttons">${appDialog.type==='confirm'?btn('Ja, Spiel verlassen','acceptAppDialog()','danger')+btn('Weiterspielen','closeAppDialog()','secondary'):btn('OK','closeAppDialog()')}</div></div></div>`;}
 function home(){return `<div class="welcome-mini">${db.current?`${avatar(db.current)}<strong>Willkommen zurück, ${esc(name(db.current))}! 🍻</strong>`:`<strong>Willkommen bei Rüfner Beer Pong! 🍻</strong>`}</div><div class="grid">${[['🤖','Training','Du gegen Rüfner 3000. Privat, ohne Statistik.','training'],['🏓','Freundschaftsspiel','Echte Duelle mit gemeinsamer Statistik.','friendship'],['🏆','Premier League','15 Nights und ein grosses Finale.','league'],['📊','Statistiken','Ranglisten, Bomben und direkte Duelle.','stats'],['👤','Profile','Spieler verwalten und Profilbild ändern.','profiles'],['📖','Regeln','Das Rüfner Beer Pong Reglement.','rules']].map(a=>`<button class="card action" onclick="go('${a[3]}')"><div class="emoji">${a[0]}</div><h3>${a[1]}</h3><p>${a[2]}</p></button>`).join('')}<button class="card action ${visibleRole()==='admin'?'':'kot-locked'}" ${visibleRole()==='admin'?`onclick="go('king')"`:'disabled'}><div class="emoji">👑</div><h3>King of the Table</h3><p>${visibleRole()==='admin'?'🔧 Admin-Testzugang':'🔒 Ab 21.12.2026'}</p></button></div>`}
 function profileImageUrl(pid){
+ if(pid==='COM')return 'ruefner-avatar.jpg';
  const p=player(pid),cfg=window.RUEFNER_SUPABASE;
  if(!p)return '';
  if(p.onlineId&&cfg?.url){const base=cfg.url+'/storage/v1/object/public/player-avatars/'+encodeURIComponent(p.onlineId)+'/avatar.jpg';return base+(p.photo?.includes('?v=')?'?v='+encodeURIComponent(p.photo.split('?v=')[1]):'');}
@@ -181,7 +182,7 @@ async function photoProfile(e){
  if(f.size>4e6)return showAppAlert('Bitte ein Bild unter 4 MB wählen.');
  try{
   const {client,user}=await cloudUser();if(user.id!==onlineUserId)throw Error('Anmeldung stimmt nicht überein.');
-  const image=await new Promise((resolve,reject)=>{const r=new FileReader();r.onerror=reject;r.onload=()=>{const im=new Image();im.onerror=reject;im.onload=()=>{const c=document.createElement('canvas');c.width=c.height=240;const ctx=c.getContext('2d');const z=Math.min(im.width,im.height);ctx.drawImage(im,(im.width-z)/2,(im.height-z)/2,z,z,0,0,240,240);c.toBlob(blob=>blob?resolve(blob):reject(Error('Bild konnte nicht verarbeitet werden.')),'image/jpeg',.8)};im.src=r.result};r.readAsDataURL(f)});
+  const image=await new Promise((resolve,reject)=>{const r=new FileReader();r.onerror=reject;r.onload=()=>{const im=new Image();im.onerror=reject;im.onload=()=>{const c=document.createElement('canvas');c.width=c.height=960;const ctx=c.getContext('2d');const z=Math.min(im.width,im.height);ctx.drawImage(im,(im.width-z)/2,(im.height-z)/2,z,z,0,0,960,960);c.toBlob(blob=>blob?resolve(blob):reject(Error('Bild konnte nicht verarbeitet werden.')),'image/jpeg',.88)};im.src=r.result};r.readAsDataURL(f)});
   const path=user.id+'/avatar.jpg';const {error}=await client.storage.from('player-avatars').upload(path,image,{contentType:'image/jpeg',upsert:true});if(error)throw error;
   const url=client.storage.from('player-avatars').getPublicUrl(path).data.publicUrl+'?v='+Date.now();
   const p=db.players.find(x=>x.onlineId===user.id);if(p){p.photo=url;p.photoUploaded=true;p.avatarCloudUploaded=true;save();}render();
@@ -708,6 +709,7 @@ function chooseFirstThrow(side){
 function beginMatch(a,b,kind,ref,difficulty,firstTurn,trainingRerack=true){
  match={id:id(),startedAt:Date.now(),a,b,kind,ref,difficulty,trainingRerack,sides:[newSide(),newSide()],turn:firstTurn,round:[],pending:null,bonus:false,comboActive:false,comboBonusThrows:0,tricks:0,bonusPhase:false,bonusType:null,awaitingTrick:false,finished:false,log:[],undo:[],pants:[{firstHit:false,down:false},{firstHit:false,down:false}]};
  match.sides[firstTurn].turns=1;
+ match.turnStartShots=match.sides[firstTurn].shots;
  match.achievementTurnStart=[10,10];window.history.pushState({ruefnerView:'game'},'','#game');view='game';render();if(isComTurn())computerTurn();
 }
 const trickNames=['Extra hoch','Unter dem Bein','Augen zu','Rückwärts','Falsche Hand','Zweimal auf den Tisch','Pfeilbogen 🏹'];
@@ -972,6 +974,7 @@ function endRound(){
  }
  ended.achievementTurnCups=0;ended.achievementTurnHits=0;ended.achievementTurnBombFinishes=0;
  match.turn=1-match.turn;match.sides[match.turn].turns++;
+ match.turnStartShots=match.sides[match.turn].shots;
  match.achievementTurnStart[match.turn]=match.sides[1-match.turn].cups.length;
  match.comboActive=false;match.comboBonusThrows=0;ui.rerack=false;render();
  if(isComTurn())setTimeout(computerTurn,500);
@@ -1143,7 +1146,15 @@ function openLiveStats(){if(!match)return;liveStatsOpen=true;render();}
 function closeLiveStats(){liveStatsOpen=false;render();}
 function liveStatsMarkup(){
  if(!match||!liveStatsOpen)return '';
- const g={a:match.a,b:match.b,sides:match.sides};
+ // Die aktuelle Aufnahme zählt erst mit dem ersten regulären Ball (0,5),
+ // mit dem zweiten Ball vollständig (1,0). Bonuswürfe erhöhen sie nicht.
+ // Vor dem ersten Wurf bleibt der AVG der abgeschlossenen Aufnahmen erhalten.
+ const sides=match.sides.map((s,i)=>{
+  if(i!==match.turn)return {...s};
+  const regularThrows=Math.max(0,s.shots-(Number.isFinite(match.turnStartShots)?match.turnStartShots:s.shots-match.round.length));
+  return {...s,turns:Math.max(0,s.turns-1)+Math.min(regularThrows,2)*0.5};
+ });
+ const g={a:match.a,b:match.b,sides};
  const rows=matchStatisticRows(g,true);
  const scoreA=Number(match.sides[0].remaining??match.sides[0].cups.length);
  const scoreB=Number(match.sides[1].remaining??match.sides[1].cups.length);
@@ -1336,7 +1347,7 @@ function stats(){
  // Lokale Trainingsergebnisse bleiben privat; die Premier League wird separat online angebunden.
  return `${periodControls()}${cloudStatsTable()}${leagueStatsOverview()}<div class="section"><h2>🤖 Höchster besiegter Rüfner 3000</h2></div><div class="panel">${db.players.filter(p=>!p.isDeleted).map(p=>`<p>${esc(p.name)}: <strong>${COM_NAMES[db.record[p.id]]||'Noch keiner'}</strong></p>`).join('')}</div>`;
 }
-function rules(){const sections=[['Aufstellen','10 Becher in Pyramidenform (4–3–2–1), mittig und ca. 10 cm von der Tischkante.'],['Anspiel','Ein Team beginnt mit zwei Würfen. Bei Uneinigkeit: Schere, Stein, Papier.'],['Werfen','Pro Team zwei Bälle pro Runde. Der Ellenbogen bleibt hinter der Tischkante.'],['Abwehren','Nicht direkte Würfe dürfen abgewehrt werden; direkte Würfe nicht. Bälle im Becher dürfen nicht herausgeblasen werden.'],['Kombinationen','Zwei unterschiedliche Becher: beide weg und zwei neue Würfe. Derselbe Becher: Bombe, dieser und drei nächstgelegene Becher weg, danach zwei neue Würfe.'],['Trickshot','Kommt der Ball ohne Fremdeinwirkung über die Tischmitte zurück, gibt es einen Trickshot.'],['Death Cup','Treffer in einen bereits getroffenen, aber noch stehenden Becher beendet das Spiel sofort.'],['Eigentor & umfallende Becher','Eigentore und umgefallene Becher haben eigene Strafregeln.'],['Island','Steht ein gegnerischer Becher allein, darf vor dem Wurf Island angesagt werden. Treffer: Gegner wählt einen zusätzlichen Becher zum Entfernen. Fehlwurf oder falscher Becher: ein eigener Becher wird entfernt. Island kann mit Kombinationen und Bomben kombiniert werden.'],['Zusammenstellen','Einmal pro Spiel, zu Beginn eines regulären eigenen Wurfs – niemals während einer Kombination oder ihrer Zusatzwürfe. Bei 6 Bechern grosse Pyramide; 5 Full House (3 Varianten); 4 Vagina; 3 kleine Pyramide; 2 Paar (3 Varianten).'],['Trinken','Getroffene Becher werden ausgetrunken; die Originalregeln enthalten zusätzliche Zeit- und Strafbestimmungen.']];return `<div class="section"><h2>📖 Rüfner Beer Pong Reglement</h2><p class="muted">Kurzübersicht. Das vollständige Originaldokument liegt der App bei.</p></div>${sections.map(([h,p])=>`<details><summary>${h}</summary><p>${p}</p></details>`).join('')}<div class="panel"><a class="btn" style="display:inline-block;text-decoration:none" href="reglement.pdf" target="_blank" rel="noopener">📄 Vollständiges Reglement (PDF)</a></div>`}
+function rules(){const sections=[['Aufstellen','10 Becher in Pyramidenform (4–3–2–1), mittig und ca. 10 cm von der Tischkante.'],['Anspiel','Ein Team beginnt mit zwei Würfen. Bei Uneinigkeit: Schere, Stein, Papier.'],['Werfen','Pro Team zwei Bälle pro Runde. Der Ellenbogen bleibt hinter der Tischkante.'],['Abwehren','Nicht direkte Würfe dürfen abgewehrt werden; direkte Würfe nicht. Bälle im Becher dürfen nicht herausgeblasen werden.'],['Kombinationen','Zwei unterschiedliche Becher: beide weg und zwei neue Würfe. Derselbe Becher: Bombe, dieser und drei nächstgelegene Becher weg, danach zwei neue Würfe.'],['Trickshot','Kommt der Ball ohne Fremdeinwirkung über die Tischmitte zurück, gibt es einen Trickshot.'],['Death Cup','Triffst du einen bereits getroffenen, aber noch nicht ausgetrunkenen Becher, gewinnst du das Spiel sofort.'],['Eigentor','Triffst du versehentlich einen deiner eigenen Becher, muss dieser getrunken und vom Tisch entfernt werden.'],['Umfallende Becher','Noch nicht getroffener Becher: Muss nachgefüllt, getrunken und vom Tisch entfernt werden. Bereits getroffener Becher: Muss nachgefüllt und getrunken werden. Zusätzlich muss ein weiterer, noch nicht getroffener Becher vom Tisch entfernt werden.'],['On Fire 🔥','Trifft ein Spieler drei Würfe hintereinander, ist er «On Fire» und darf so lange weiterwerfen, bis er einen Wurf verfehlt.'],['Pants Down 👖','Triffst du mit deinem ersten erfolgreichen Treffer den mittleren Becher, musst du deine Hose herunterlassen. Sie bleibt unten, bis du deinen nächsten Treffer erzielst.'],['Island','Steht ein gegnerischer Becher allein, darf vor dem Wurf Island angesagt werden. Treffer: Gegner wählt einen zusätzlichen Becher zum Entfernen. Fehlwurf oder falscher Becher: ein eigener Becher wird entfernt. Island kann mit Kombinationen und Bomben kombiniert werden.'],['Zusammenstellen','Einmal pro Spiel, zu Beginn eines regulären eigenen Wurfs – niemals während einer Kombination oder ihrer Zusatzwürfe. Bei 6 Bechern grosse Pyramide; 5 Full House (3 Varianten); 4 Vagina; 3 kleine Pyramide; 2 Paar (3 Varianten).'],['Trinken','Getroffene Becher werden ausgetrunken; die Originalregeln enthalten zusätzliche Zeit- und Strafbestimmungen.']];return `<div class="section"><h2>📖 Rüfner Beer Pong Reglement</h2><p class="muted">Kurzübersicht. Das vollständige Originaldokument liegt der App bei.</p></div>${sections.map(([h,p])=>`<details><summary>${h}</summary><p>${p}</p></details>`).join('')}<div class="panel"><a class="btn" style="display:inline-block;text-decoration:none" href="reglement.pdf" target="_blank" rel="noopener">📄 Vollständiges Reglement (PDF)</a></div>`}
 window.history.replaceState({ruefnerView:'home'},'','#home');
 render();
 if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('./sw.js?v=46').catch(()=>{});
