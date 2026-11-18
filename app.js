@@ -654,7 +654,7 @@ async function saveFriendlyOnline(g){
  if(!a||!b||!winner)throw Error('Beide Spieler müssen registrierte Online-Profile sein. Bitte Spielerauswahl aktualisieren.');
  const {client,user}=await cloudUser();
  if(g.kind==='king'&&(!kot?.tournamentId||!kot.current||kot.current[0]!==g.a||kot.current[1]!==g.b))throw Error('King-Turnierstatus fehlt oder Teilnehmer stimmen nicht überein.');
- if(g.kind!=='king'&&user.id!==a&&user.id!==b)throw Error('Nur ein beteiligter Spieler darf das Ergebnis online speichern.');
+ // Freundschaftsspiele duerfen auch von angemeldeten Drittpersonen erfasst werden.
  const payload={
   client_match_id:g.id,player_a:a,player_b:b,winner,recorded_by:user.id,
   played_at:g.date,side_a:g.sides[0],side_b:g.sides[1]
